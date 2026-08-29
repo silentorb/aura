@@ -16,14 +16,18 @@ TBD
 
 ## Core domains
 
-Named areas of concern. Scope and behavior to be defined.
-
 | Domain | Description |
 |--------|-------------|
 | Composition | TBD — procedural generation and structuring of musical material |
-| Synthesis | TBD — sound generation and timbral control |
+| Synthesis | FunDSP-based audio graph construction (`aura-dsp`) |
 | Sequencing | TBD — temporal organization and playback of musical events |
-| Rendering | TBD — output of audio (and potentially other formats) |
+| Rendering | Offline WAV export to disk; real-time CPAL playback deferred |
+
+### Rendering (initial scope)
+
+- Generate audio offline via FunDSP `Wave::render`.
+- Write 32-bit float WAV files to an untracked `output/` directory.
+- Real-time playback via CPAL is planned but deferred until the dev environment supports audio output reliably.
 
 ## Open questions
 

@@ -11,15 +11,11 @@ Personal flow optimization — not project documentation. Do not add this workfl
 
 ### 1. Baseline snapshot
 
-In each repo that may be affected, run read-only git commands and record results in a **Commit strategy** section:
-
-| Repo path | Typical changes |
-| --------- | --------------- |
-| `/workspaces/tome/` | Packages, tests, `docs/features/` |
-| `/workspaces/marloth-story/` | `content/`, Marloth docs |
-| Workbench root | Devcontainer, scripts, root `AGENTS.md` |
+Identify each **git repository** that may be affected (workspace root, nested repos, sibling repos mounted in the same dev environment). In each, run read-only git commands and record results in a **Commit strategy** section:
 
 Commands per repo: `git status --short`, `git diff`, `git diff --staged` (if staged), `git log -3 --oneline`.
+
+Note whether each repo is **clean** or **dirty**, and list any pre-existing dirty paths.
 
 ### 2. Classify dirty files
 
@@ -35,7 +31,7 @@ Label each changed path:
 
 Default: **one commit per affected repo** (not one squashed commit across repos).
 
-For each affected repo specify: files to include, files to exclude, draft commit message (1–2 sentences, why not what; match recent `git log` style).
+For each affected repo specify: repo path (or name), files to include, files to exclude, draft commit message (1–2 sentences, why not what; match recent `git log` style).
 
 ### 4. Final todo (always last)
 
@@ -51,12 +47,11 @@ Keep `pending` during planning and implementation unless the user asks to commit
 ## Commit strategy
 
 ### Baseline (plan created)
-- /workspaces/tome: clean | dirty — list pre-existing files
-- /workspaces/marloth-story: …
-- workbench: …
+- <repo-path-or-name>: clean | dirty — list pre-existing files
+- <repo-path-or-name>: …
 
 ### Intended commits
-#### /workspaces/tome (tome repo)
+#### <repo-path-or-name>
 - Include: …
 - Exclude: …
 - Draft message: "…"

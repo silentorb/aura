@@ -1,0 +1,13 @@
+[package]
+name = "aura-sample"
+description = "Sample primitives and audio timing types for Aura"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dasp_sample = { workspace = true }
+dasp_signal = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]

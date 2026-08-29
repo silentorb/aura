@@ -34,6 +34,6 @@ What becomes easier or harder as a result?
 
 | ADR | Title | Date | Status |
 |-----|-------|------|--------|
-| — | — | — | — |
-
-_No decisions recorded yet._
+| [0001](0001-multi-crate-workspace.md) | Multi-crate workspace | 2026-08-29 | Accepted |
+| [0002](0002-audio-stack.md) | Audio stack: DASP, FunDSP, CPAL | 2026-08-29 | Accepted |
+| [0003](0003-file-first-io.md) | File-first I/O | 2026-08-29 | Accepted |

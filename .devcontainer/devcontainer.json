@@ -2,7 +2,7 @@
   "name": "Aura",
   "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
   "remoteUser": "vscode",
-  "postCreateCommand": "rustc --version && cargo --version",
+  "postCreateCommand": "sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev pkg-config && rustc --version && cargo --version",
   "customizations": {
     "vscode": {
       "extensions": [

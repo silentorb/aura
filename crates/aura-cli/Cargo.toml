@@ -1,0 +1,21 @@
+[package]
+name = "aura-cli"
+description = "Aura command-line interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "aura"
+path = "src/main.rs"
+
+[dependencies]
+aura-dsp = { path = "../aura-dsp" }
+aura-io-wav = { path = "../aura-io-wav" }
+aura-render = { path = "../aura-render" }
+aura-sample = { path = "../aura-sample" }
+fundsp = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

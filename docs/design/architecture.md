@@ -1,29 +1,62 @@
 # Architecture
 
-High-level system overview for Aura. Components and boundaries are placeholders until defined.
+High-level system overview for Aura.
 
 ## High-level components
 
 | Component | Role |
 |-----------|------|
 | Composer | TBD — procedural generation and structuring of musical material |
-| Synthesizer | TBD — sound generation and timbral control |
+| Synthesizer | FunDSP graph builders (`aura-dsp`) |
 | Scheduler | TBD — temporal organization and event dispatch |
-| I/O | TBD — audio output and external interfaces |
+| I/O | Offline WAV export (`aura-io-wav`); CPAL playback stub (`aura-io-cpal`, deferred) |
 
-## Module boundaries
+## Crate layout
 
-TBD — to be defined as the crate structure emerges.
+| Crate | Role | Key dependencies |
+|-------|------|------------------|
+| [`aura-sample`](../../crates/aura-sample) | Sample primitives, sample rate, timing math | DASP |
+| [`aura-dsp`](../../crates/aura-dsp) | FunDSP graph builders (sine, etc.) | FunDSP, aura-sample |
+| [`aura-render`](../../crates/aura-render) | Offline rendering via `RenderSpec` | FunDSP, aura-dsp, aura-sample |
+| [`aura-io-wav`](../../crates/aura-io-wav) | 32-bit float WAV write/read verification | FunDSP, aura-render |
+| [`aura-io-cpal`](../../crates/aura-io-cpal) | Real-time playback stub (CPAL bridge) | CPAL, DASP, aura-render |
+| [`aura-cli`](../../crates/aura-cli) | Command-line tools | All of the above |
+
+Dependency direction flows inward: applications → I/O → render → dsp → sample.
+
+## Data flow
+
+### Offline rendering (current)
+
+```mermaid
+flowchart LR
+  cli[aura-cli] --> dsp[aura-dsp graph]
+  cli --> render[aura-render]
+  render --> wave[FunDSP Wave]
+  wave --> wav[aura-io-wav]
+  wav --> file[output/sine.wav]
+```
+
+### Real-time playback (deferred)
+
+```mermaid
+flowchart LR
+  app[Application] --> dsp[aura-dsp graph]
+  app --> cpal[aura-io-cpal]
+  cpal --> device[Audio device]
+  dsp --> cpal
+```
+
+Both paths share the same FunDSP `AudioUnit` graph and `RenderSpec` parameters. Offline uses `Wave::render`; real-time will use block `AudioUnit::process` into CPAL callback buffers with DASP sample conversion.
 
 ## Considerations
 
-Factors to weigh during design. Not decisions until recorded as ADRs.
-
-- **Real-time audio** — low-latency output may constrain architecture
+- **Real-time audio** — low-latency output may constrain architecture; deferred in WSL/devcontainer
 - **Determinism** — procedural composition may require reproducible results from a given seed
-- **Modularity** — composition, synthesis, and sequencing may be separable concerns
+- **Modularity** — composition, synthesis, and sequencing are separable; enforced via crate boundaries
 - **Performance** — synthesis and rendering are likely CPU-intensive
 
 ## Open questions
 
-TBD
+- Composition and scheduling crate boundaries
+- Whether to add `hound` for finer-grained WAV/CPAL interop
