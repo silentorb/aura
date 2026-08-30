@@ -1,0 +1,10 @@
+[package]
+name = "aura-imp"
+description = "Imp graph integration for Aura"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+imp_core_types = { workspace = true }
+imp_registry = { workspace = true }

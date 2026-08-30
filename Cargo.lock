@@ -65,8 +65,19 @@ dependencies = [
 name = "aura-dsp"
 version = "0.1.0"
 dependencies = [
+ "aura-imp",
+ "aura-render",
  "aura-sample",
  "fundsp",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "aura-imp"
+version = "0.1.0"
+dependencies = [
+ "imp_core_types",
+ "imp_registry",
 ]
 
 [[package]]
@@ -496,6 +507,21 @@ name = "hermit-abi"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
+
+[[package]]
+name = "imp_core_types"
+version = "0.2.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "imp_registry"
+version = "0.2.0"
+dependencies = [
+ "imp_core_types",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "indexmap"
@@ -1022,6 +1048,16 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+
+[[package]]
+name = "serde"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_core"

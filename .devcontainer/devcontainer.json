@@ -1,8 +1,14 @@
 {
   "name": "Aura",
-  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
   "remoteUser": "vscode",
-  "postCreateCommand": "sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev pkg-config && rustc --version && cargo --version",
+  "mounts": [
+    "source=${localEnv:HOME}/dev/imp-ts,target=${containerWorkspaceFolder}/.mnt/imp-ts,type=bind,consistency=cached,readonly",
+    "source=${localEnv:HOME}/dev/imp-spec,target=${containerWorkspaceFolder}/.mnt/imp-spec,type=bind,consistency=cached"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/aura-sample",
+    "crates/aura-imp",
     "crates/aura-dsp",
     "crates/aura-render",
     "crates/aura-io-wav",
@@ -16,6 +17,8 @@ license = "MIT"
 repository = "https://github.com/silentorb/aura"
 
 [workspace.dependencies]
+imp_core_types = { path = "/opt/imp-rust/crates/imp_core_types" }
+imp_registry = { path = "/opt/imp-rust/crates/imp_registry" }
 dasp_sample = "0.11"
 dasp_signal = "0.11"
 fundsp = "0.23"

@@ -1,7 +1,11 @@
 //! FunDSP graph builders for Aura synthesis.
 
+mod compile;
+
 use fundsp::audiounit::AudioUnit;
 use fundsp::prelude32::{An, AudioNode};
+
+pub use compile::{compile_graph, CompileError};
 
 /// Returns a mono sine oscillator at `frequency` Hz.
 pub fn sine_hz(frequency: f32) -> An<impl AudioNode> {

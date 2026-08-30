@@ -6,7 +6,11 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+aura-imp = { path = "../aura-imp" }
 aura-sample = { path = "../aura-sample" }
 fundsp = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
+aura-render = { path = "../aura-render" }
+aura-sample = { path = "../aura-sample" }

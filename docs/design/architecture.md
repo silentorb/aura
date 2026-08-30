@@ -7,7 +7,7 @@ High-level system overview for Aura.
 | Component | Role |
 |-----------|------|
 | Composer | TBD — procedural generation and structuring of musical material |
-| Synthesizer | FunDSP graph builders (`aura-dsp`) |
+| Synthesizer | Imp graph libraries (`aura-imp`) and FunDSP lowering (`aura-dsp`) |
 | Scheduler | TBD — temporal organization and event dispatch |
 | I/O | Offline WAV export (`aura-io-wav`); CPAL playback stub (`aura-io-cpal`, deferred) |
 
@@ -16,15 +16,26 @@ High-level system overview for Aura.
 | Crate | Role | Key dependencies |
 |-------|------|------------------|
 | [`aura-sample`](../../crates/aura-sample) | Sample primitives, sample rate, timing math | DASP |
-| [`aura-dsp`](../../crates/aura-dsp) | FunDSP graph builders (sine, etc.) | FunDSP, aura-sample |
+| [`aura-imp`](../../crates/aura-imp) | Imp graph integration, Aura DSP node libraries | imp_core_types, imp_registry |
+| [`aura-dsp`](../../crates/aura-dsp) | FunDSP graph builders; Imp → FunDSP compiler | FunDSP, aura-imp, aura-sample |
 | [`aura-render`](../../crates/aura-render) | Offline rendering via `RenderSpec` | FunDSP, aura-dsp, aura-sample |
 | [`aura-io-wav`](../../crates/aura-io-wav) | 32-bit float WAV write/read verification | FunDSP, aura-render |
 | [`aura-io-cpal`](../../crates/aura-io-cpal) | Real-time playback stub (CPAL bridge) | CPAL, DASP, aura-render |
 | [`aura-cli`](../../crates/aura-cli) | Command-line tools | All of the above |
 
-Dependency direction flows inward: applications → I/O → render → dsp → sample.
+Dependency direction flows inward: applications → I/O → render → dsp → imp → (imp-rust) / sample.
 
 ## Data flow
+
+### Imp graph → offline render
+
+```mermaid
+flowchart LR
+  impGraph[Imp Graph] --> auraImp[aura-imp library]
+  auraImp --> compile[aura-dsp compile_graph]
+  compile --> unit[FunDSP AudioUnit]
+  unit --> render[aura-render]
+```
 
 ### Offline rendering (current)
 
