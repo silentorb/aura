@@ -2,11 +2,16 @@
 resolver = "2"
 members = [
     "crates/aura-sample",
+    "crates/aura-composition",
+    "crates/aura-composer",
+    "crates/aura-scheduler",
+    "crates/aura-instrumentation",
     "crates/aura-imp",
     "crates/aura-dsp",
     "crates/aura-render",
     "crates/aura-io-wav",
     "crates/aura-io-cpal",
+    "crates/aura-demo",
     "crates/aura-cli",
 ]
 

@@ -1,0 +1,18 @@
+[package]
+name = "aura-instrumentation"
+description = "Instrument definitions and per-note sampling for Aura"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aura-composition = { path = "../aura-composition" }
+aura-dsp = { path = "../aura-dsp" }
+aura-sample = { path = "../aura-sample" }
+aura-scheduler = { path = "../aura-scheduler" }
+fundsp = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+aura-composer = { path = "../aura-composer" }
+aura-scheduler = { path = "../aura-scheduler" }

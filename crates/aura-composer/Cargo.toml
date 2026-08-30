@@ -1,0 +1,11 @@
+[package]
+name = "aura-composer"
+description = "Procedural composition generators for Aura"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aura-composition = { path = "../aura-composition" }
+
+[dev-dependencies]

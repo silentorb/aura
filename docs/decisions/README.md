@@ -37,3 +37,5 @@ What becomes easier or harder as a result?
 | [0001](0001-multi-crate-workspace.md) | Multi-crate workspace | 2026-08-29 | Accepted |
 | [0002](0002-audio-stack.md) | Audio stack: DASP, FunDSP, CPAL | 2026-08-29 | Accepted |
 | [0003](0003-file-first-io.md) | File-first I/O | 2026-08-29 | Accepted |
+| [0004](0004-imp-integration.md) | Imp integration | 2026-08-29 | Accepted |
+| [0005](0005-composition-instrumentation-crates.md) | Composition, scheduler, and instrumentation crates | 2026-08-30 | Accepted |

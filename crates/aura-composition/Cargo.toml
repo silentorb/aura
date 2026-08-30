@@ -1,0 +1,11 @@
+[package]
+name = "aura-composition"
+description = "Musical notation types and utilities for Aura"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
