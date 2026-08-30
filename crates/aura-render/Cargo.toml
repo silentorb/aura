@@ -8,7 +8,6 @@ license.workspace = true
 [dependencies]
 aura-dsp = { path = "../aura-dsp" }
 aura-sample = { path = "../aura-sample" }
-fundsp = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -2,10 +2,9 @@
 
 use crate::adsr::LinearAdsr;
 use crate::sampler::Instrument;
-use aura_dsp::{sine_hz, to_unit};
+use aura_dsp::sine;
 use aura_sample::SampleRate;
 use aura_scheduler::{ScheduleContext, ScheduledEvent};
-use fundsp::audiounit::AudioUnit;
 
 /// Sine wave instrument with a linear ADSR envelope per note.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -25,19 +24,15 @@ impl Instrument for SineInstrument {
         let frames = scheduled.duration_frames;
         let note_duration_secs = frames as f64 / rate;
         let velocity = scheduled.event.velocity;
+        let start_secs = scheduled.start_frame as f64 / rate;
 
-        let mut unit: Box<dyn AudioUnit> = to_unit(sine_hz(frequency));
-        unit.set_sample_rate(rate);
-        unit.reset();
-
-        let mut sample = [0.0f32];
         let mut buffer = Vec::with_capacity(frames);
 
         for frame in 0..frames {
-            unit.tick(&[], &mut sample);
-            let elapsed = frame as f64 / rate;
-            let env = self.adsr.value_at(elapsed, note_duration_secs);
-            buffer.push(sample[0] * env * velocity);
+            let global_t = start_secs + frame as f64 / rate;
+            let local_t = global_t - start_secs;
+            let env = self.adsr.value_at(local_t, note_duration_secs);
+            buffer.push(sine(frequency, local_t) * env * velocity);
         }
 
         buffer

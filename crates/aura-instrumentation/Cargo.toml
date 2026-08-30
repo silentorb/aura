@@ -10,7 +10,6 @@ aura-composition = { path = "../aura-composition" }
 aura-dsp = { path = "../aura-dsp" }
 aura-sample = { path = "../aura-sample" }
 aura-scheduler = { path = "../aura-scheduler" }
-fundsp = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

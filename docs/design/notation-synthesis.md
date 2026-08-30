@@ -4,9 +4,9 @@ How musical notation becomes audio in Aura. This document governs integration ac
 
 ## Purpose and scope
 
-Aura separates **what** music is (notation), **when** it happens (scheduling), **how** it sounds (instrumentation and synthesis), and **where** it goes (I/O). Surface programs such as [`aura-demo`](../../crates/aura-demo) wire these layers explicitly.
+Aura separates **what** music is (notation), **when** it happens (scheduling), **how** it sounds (instrumentation and synthesis), and **where** it goes (I/O). Surface programs load Imp graphs via [`aura-integration`](../../crates/aura-integration) and [`aura-cli`](../../crates/aura-cli).
 
-See also [`architecture.md`](architecture.md) for the full system overview.
+See also [`architecture.md`](architecture.md) and [`imp-execution.md`](imp-execution.md).
 
 ## Glossary
 
@@ -16,26 +16,25 @@ See also [`architecture.md`](architecture.md) for the full system overview.
 | **Composition** | Procedural generators that produce notation |
 | **Scheduling** | Converting musical time to sample-frame timelines |
 | **Instrumentation** | Per-note instrument instances, envelopes, and mix-down |
-| **Synthesis** | Signal-level DSP (FunDSP graphs, oscillators) |
-| **Rendering** | Producing PCM buffers or whole-graph offline output |
+| **Synthesis** | Pure Time → Sample DSP and Imp graph translation |
+| **Rendering** | Sampling `f(t)` over a duration; WAV export |
 
 ## Pipeline
 
 ```mermaid
 flowchart LR
-  composition[aura-composition] --> scheduler[aura-scheduler]
-  scheduler --> instrumentation[aura-instrumentation]
-  instrumentation --> synthesis[aura-dsp]
-  instrumentation --> output[PCM mix buffer]
-  demo[aura-demo] --> wav[aura-io-wav]
+  graph[Imp graph JSON] --> integration[aura-integration]
+  integration --> composition[aura-composition]
+  integration --> scheduler[aura-scheduler]
+  integration --> dsp[aura-dsp]
+  integration --> wav[aura-io-wav]
 ```
 
-1. **Notation** — a `Score` with `NoteEvent` entries in beats.
-2. **Schedule** — `schedule_offline` converts beats to sample frames; provides lookahead via `ScheduleContext`.
-3. **Instrument instance** — one instance per note by default; renders PCM for that note.
-4. **Synth graph** — v1 uses direct FunDSP primitives; future instruments may use Imp graphs compiled via `aura-dsp`.
-5. **Mix** — `sample_schedule` sums per-note buffers into a single timeline.
-6. **Output** — surface programs write WAV or drive real-time I/O.
+1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
+2. **Translation** — `translate_graph` composes pure `Sampler` closures.
+3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
+4. **Notation path** — `minor_arpeggio` and related nodes build scores; schedule tables drive note gates at sample time.
+5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules
 
@@ -71,20 +70,21 @@ Long term, an entire song should be describable as a **single function**, with g
 | [`aura-composer`](../../crates/aura-composer) | Procedural generators (e.g. arpeggios) |
 | [`aura-scheduler`](../../crates/aura-scheduler) | Offline timeline, frame offsets, `ScheduleContext` |
 | [`aura-instrumentation`](../../crates/aura-instrumentation) | `Instrument` trait, per-note render, mix-down |
-| [`aura-imp`](../../crates/aura-imp) | Declarative Imp DSP node libraries |
-| [`aura-dsp`](../../crates/aura-dsp) | FunDSP primitives and Imp compiler |
-| [`aura-render`](../../crates/aura-render) | Whole-graph offline render |
+| [`aura-imp`](../../crates/aura-imp) | Imp node libraries and JSON helpers |
+| [`aura-dsp`](../../crates/aura-dsp) | Pure Time → Sample DSP functions |
+| [`aura-render`](../../crates/aura-render) | Offline sampling via `Sampler` |
 | [`aura-sample`](../../crates/aura-sample) | Sample rate, seconds→frames |
-| [`aura-demo`](../../crates/aura-demo) | Surface integration reference program |
+| [`aura-integration`](../../crates/aura-integration) | Graph translation and render glue |
+| [`aura-cli`](../../crates/aura-cli) | Thin graph-driven CLI |
 
-Dependency direction flows inward. **Integration belongs at the surface**—demo and specialized programs declare every crate they wire together directly.
+Dependency direction flows inward. **Integration belongs at the surface**—`aura-integration`, CLI, and demo scripts declare every crate they wire together directly.
 
 ## Integration at the surface
 
-An indirect dependency is a hidden direct dependency. Core library crates expose focused APIs and must not bury orchestration. Programs like `aura-demo` own the wiring: compose → schedule → sample → write WAV.
+An indirect dependency is a hidden direct dependency. Core library crates expose focused APIs and must not bury orchestration. `aura-integration` and thin surface programs own the wiring: load graph → translate → sample → write WAV.
 
 ## Open questions
 
 - Live CPAL scheduler parity with offline lookahead semantics
-- Imp graph per voice vs. direct FunDSP for simple instruments
-- Voice pooling when polyphony limits matter
+- Graph-owned duration vs external render parameters
+- Buffer sampling optimizations preserving FP semantics

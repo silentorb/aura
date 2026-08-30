@@ -11,7 +11,7 @@ members = [
     "crates/aura-render",
     "crates/aura-io-wav",
     "crates/aura-io-cpal",
-    "crates/aura-demo",
+    "crates/aura-integration",
     "crates/aura-cli",
 ]
 
@@ -26,7 +26,6 @@ imp_core_types = { path = "/opt/imp-rust/crates/imp_core_types" }
 imp_registry = { path = "/opt/imp-rust/crates/imp_registry" }
 dasp_sample = "0.11"
 dasp_signal = "0.11"
-fundsp = "0.23"
 cpal = "0.18"
 thiserror = "2"
 tempfile = "3"

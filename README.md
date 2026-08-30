@@ -4,7 +4,7 @@ Procedural music composition and synthesis software.
 
 ## Status
 
-Early / pre-alpha. Multi-crate workspace with offline WAV rendering.
+Early / pre-alpha. Multi-crate workspace with Imp graph-driven offline WAV rendering.
 
 ## Language
 
@@ -22,20 +22,30 @@ Open the repository in a Dev Container to get rust-analyzer, Clippy, and LLDB pr
 cargo build
 cargo test
 cargo clippy
-cargo run -p aura-cli
+./demos/render-all.sh
 ```
 
-The last command generates a 10-second 440 Hz sine wave at `output/sine.wav` (32-bit float, mono, 44100 Hz). The `output/` directory is gitignored.
+This renders `demos/sine.json` and `demos/arpeggio.json` to `output/sine.wav` and `output/arpeggio.wav` (32-bit float, mono, 44100 Hz). The `output/` directory is gitignored.
 
-### CLI options
+### CLI
+
+```bash
+cargo run -p aura-cli -- \
+  --graph demos/sine.json \
+  --output output/sine.wav \
+  --duration 10s \
+  --sample-rate 44100
+```
 
 ```
-aura [OPTIONS]
+aura --graph PATH --output PATH [OPTIONS]
 
-  -f, --frequency <HZ>      Sine frequency (default: 440)
-  -d, --duration <SECS>     Duration in seconds (default: 10)
-  -r, --sample-rate <HZ>    Sample rate (default: 44100)
-  -o, --output <PATH>       Output path (default: output/sine.wav)
+  -g, --graph PATH         Imp graph JSON file
+  -o, --output PATH        Output WAV path
+  -d, --duration SPEC      Seconds (10, 10s) or measures (2m)
+  --tempo BPM              Tempo for measure durations (default: 120)
+  -r, --sample-rate HZ     Sample rate (default: 44100)
+  -h, --help               Show help
 ```
 
 ## Workspace crates
@@ -43,12 +53,17 @@ aura [OPTIONS]
 | Crate | Purpose |
 |-------|---------|
 | `aura-sample` | DASP sample primitives and timing types |
-| `aura-imp` | Imp graph integration and Aura DSP node libraries |
-| `aura-dsp` | FunDSP synthesis graph builders; Imp → FunDSP compiler |
-| `aura-render` | Offline audio rendering |
+| `aura-composition` | Notation types and musical time |
+| `aura-composer` | Procedural composition generators |
+| `aura-scheduler` | Offline event scheduling |
+| `aura-instrumentation` | Per-note instruments and mix-down |
+| `aura-imp` | Imp node libraries and JSON helpers |
+| `aura-dsp` | Pure Time → Sample DSP functions |
+| `aura-render` | Offline sampling via `Sampler` |
 | `aura-io-wav` | WAV file I/O |
 | `aura-io-cpal` | CPAL playback stub (deferred) |
-| `aura-cli` | Command-line interface |
+| `aura-integration` | Imp graph translation and render glue |
+| `aura-cli` | Thin graph-driven CLI |
 
 ## Dependency graph
 
@@ -57,34 +72,41 @@ flowchart TD
   subgraph external [External]
     impCore[imp_core_types]
     impReg[imp_registry]
-    fundsp[fundsp]
   end
 
   sample[aura-sample]
+  composition[aura-composition]
+  composer[aura-composer]
+  scheduler[aura-scheduler]
+  instrumentation[aura-instrumentation]
   auraImp[aura-imp]
   dsp[aura-dsp]
   render[aura-render]
   ioWav[aura-io-wav]
-  ioCpal[aura-io-cpal]
+  integration[aura-integration]
   cli[aura-cli]
 
   auraImp --> impCore
   auraImp --> impReg
-  dsp --> auraImp
-  dsp --> sample
-  dsp --> fundsp
+  composer --> composition
+  scheduler --> composition
+  scheduler --> sample
+  instrumentation --> scheduler
+  instrumentation --> dsp
+  instrumentation --> sample
   render --> dsp
   render --> sample
-  render --> fundsp
   ioWav --> render
-  ioWav --> fundsp
-  ioCpal --> render
-  ioCpal --> sample
-  cli --> dsp
-  cli --> ioWav
-  cli --> render
+  ioWav --> sample
+  integration --> auraImp
+  integration --> composer
+  integration --> scheduler
+  integration --> instrumentation
+  integration --> dsp
+  integration --> render
+  integration --> ioWav
+  cli --> integration
   cli --> sample
-  cli --> fundsp
 ```
 
 ## Documentation

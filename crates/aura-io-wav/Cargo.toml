@@ -7,10 +7,9 @@ license.workspace = true
 
 [dependencies]
 aura-render = { path = "../aura-render" }
-fundsp = { workspace = true }
+aura-sample = { path = "../aura-sample" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 aura-dsp = { path = "../aura-dsp" }
-aura-sample = { path = "../aura-sample" }

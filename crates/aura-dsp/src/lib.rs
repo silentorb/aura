@@ -1,20 +1,23 @@
-//! FunDSP graph builders for Aura synthesis.
+//! Pure Time → Sample DSP functions for Aura.
 
-mod compile;
+use std::f64::consts::TAU;
 
-use fundsp::audiounit::AudioUnit;
-use fundsp::prelude32::{An, AudioNode};
-
-pub use compile::{compile_graph, CompileError};
-
-/// Returns a mono sine oscillator at `frequency` Hz.
-pub fn sine_hz(frequency: f32) -> An<impl AudioNode> {
-    fundsp::prelude32::sine_hz(frequency)
+/// Pure mono sine: `sin(2π · frequency · time)`.
+#[must_use]
+pub fn sine(frequency: f32, time: f64) -> f32 {
+    (TAU * f64::from(frequency) * time).sin() as f32
 }
 
-/// Converts a static audio node into a dynamic audio unit for rendering.
-pub fn to_unit(node: An<impl AudioNode + 'static>) -> Box<dyn AudioUnit> {
-    Box::new(node)
+/// Multiplies two sample/control values at time `t`.
+#[must_use]
+pub fn multiply(a: f32, b: f32) -> f32 {
+    a * b
+}
+
+/// Converts pitch in Hz to frequency for oscillators (identity helper).
+#[must_use]
+pub fn hz(hz: f64) -> f32 {
+    hz as f32
 }
 
 #[cfg(test)]
@@ -22,26 +25,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sine_hz_oscillates_within_unit_range() {
-        let mut unit = to_unit(sine_hz(440.0));
-        unit.set_sample_rate(44_100.0);
-        unit.reset();
+    fn sine_is_pure_in_time() {
+        let a = sine(440.0, 0.25);
+        let b = sine(440.0, 0.25);
+        assert_eq!(a, b);
+    }
 
-        let mut output = [0.0f32];
-        unit.tick(&[], &mut output);
-        assert!(output[0].abs() <= 1.0);
+    #[test]
+    fn sine_crosses_zero_at_start() {
+        assert!(sine(440.0, 0.0).abs() < 1e-6);
+    }
 
-        let period = (44_100.0_f64 / 440.0).round() as usize;
-        let mut min = f32::MAX;
-        let mut max = f32::MIN;
-
-        for _ in 0..period {
-            unit.tick(&[], &mut output);
-            min = min.min(output[0]);
-            max = max.max(output[0]);
-        }
-
-        assert!(max > 0.9, "expected positive peak near 1.0, got {max}");
-        assert!(min < -0.9, "expected negative peak near -1.0, got {min}");
+    #[test]
+    fn sine_peak_near_quarter_period() {
+        let period = 1.0 / 440.0;
+        let peak = sine(440.0, period / 4.0);
+        assert!(peak > 0.99);
     }
 }

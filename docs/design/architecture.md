@@ -2,7 +2,7 @@
 
 High-level system overview for Aura.
 
-Aura is a **library-first framework**. Specialized programs (e.g. [`aura-demo`](../../crates/aura-demo)) compose domain crates at the surface. See [`notation-synthesis.md`](notation-synthesis.md) for notation→audio integration rules.
+Aura is a **library-first framework**. Surface programs load Imp graphs and render audio via [`aura-integration`](../../crates/aura-integration). See [`notation-synthesis.md`](notation-synthesis.md) and [`imp-execution.md`](imp-execution.md).
 
 ## High-level components
 
@@ -10,7 +10,8 @@ Aura is a **library-first framework**. Specialized programs (e.g. [`aura-demo`](
 |-----------|------|
 | Composition | Notation types (`aura-composition`) and procedural generators (`aura-composer`) |
 | Scheduler | Offline timeline and event dispatch (`aura-scheduler`); live CPAL dispatch deferred |
-| Synthesizer | Imp graph libraries (`aura-imp`) and FunDSP lowering (`aura-dsp`) |
+| Synthesizer | Imp node libraries (`aura-imp`) and pure DSP (`aura-dsp`) |
+| Integration | Graph translation and sampling (`aura-integration`) |
 | Instrumentation | Per-note sampling and mix-down (`aura-instrumentation`) |
 | I/O | Offline WAV export (`aura-io-wav`); CPAL playback stub (`aura-io-cpal`, deferred) |
 
@@ -23,67 +24,53 @@ Aura is a **library-first framework**. Specialized programs (e.g. [`aura-demo`](
 | [`aura-composer`](../../crates/aura-composer) | Procedural generators | aura-composition |
 | [`aura-scheduler`](../../crates/aura-scheduler) | Offline schedule, lookahead context | aura-composition, aura-sample |
 | [`aura-instrumentation`](../../crates/aura-instrumentation) | Instruments, per-note render, mix-down | aura-scheduler, aura-dsp, aura-sample |
-| [`aura-imp`](../../crates/aura-imp) | Imp graph integration, Aura DSP node libraries | imp_core_types, imp_registry |
-| [`aura-dsp`](../../crates/aura-dsp) | FunDSP graph builders; Imp → FunDSP compiler | FunDSP, aura-imp, aura-sample |
-| [`aura-render`](../../crates/aura-render) | Offline rendering via `RenderSpec` | FunDSP, aura-dsp, aura-sample |
-| [`aura-io-wav`](../../crates/aura-io-wav) | 32-bit float WAV write/read verification | FunDSP, aura-render |
+| [`aura-imp`](../../crates/aura-imp) | Imp node libraries and JSON helpers | imp_core_types, imp_registry |
+| [`aura-dsp`](../../crates/aura-dsp) | Pure Time → Sample DSP functions | — |
+| [`aura-render`](../../crates/aura-render) | Offline sampling via `Sampler` | aura-dsp, aura-sample |
+| [`aura-io-wav`](../../crates/aura-io-wav) | 32-bit float WAV write/read verification | aura-render, aura-sample |
 | [`aura-io-cpal`](../../crates/aura-io-cpal) | Real-time playback stub (CPAL bridge) | CPAL, DASP, aura-render |
-| [`aura-demo`](../../crates/aura-demo) | Surface integration reference program | composition stack, render, io-wav |
-| [`aura-cli`](../../crates/aura-cli) | Legacy sine scaffold (deferred) | aura-dsp, aura-render, aura-io-wav |
+| [`aura-integration`](../../crates/aura-integration) | Imp graph translation and render glue | aura-imp, composition stack, render, io-wav |
+| [`aura-cli`](../../crates/aura-cli) | Thin graph-driven CLI | aura-integration |
 
-Dependency direction flows inward: surface programs → I/O → render → instrumentation → scheduler → composition → sample / dsp → imp.
+Dependency direction flows inward: surface programs → integration → I/O → render → domain crates → sample / dsp → imp.
 
 ### Surface integration
 
-An indirect dependency is a hidden direct dependency. Orchestration lives in surface crates (`aura-demo`, future specialized programs), not inside core libraries.
+An indirect dependency is a hidden direct dependency. Orchestration lives in `aura-integration` and thin surface programs (`aura-cli`, demo scripts), not inside core libraries.
 
 ## Data flow
 
-### Notation → offline WAV (v1)
+### Imp graph → offline WAV
 
 ```mermaid
 flowchart LR
-  demo[aura-demo] --> composer[aura-composer]
-  composer --> score[Score]
-  score --> scheduler[aura-scheduler]
-  scheduler --> instrumentation[aura-instrumentation]
-  instrumentation --> dsp[aura-dsp]
-  demo --> render[aura-render]
-  demo --> wav[aura-io-wav]
-  wav --> files[output WAV files]
+  json[JSON graph] --> load[load_graph]
+  load --> translate[translate_graph]
+  translate --> sampler[Sampler at t]
+  sampler --> pcm[PCM buffer]
+  pcm --> wav[aura-io-wav]
+  cli[aura-cli] --> load
+  cli --> translate
+  cli --> sampler
+  cli --> wav
 ```
 
-### Imp graph → offline render
+### Notation in Imp graphs
 
-```mermaid
-flowchart LR
-  impGraph[Imp Graph] --> auraImp[aura-imp library]
-  auraImp --> compile[aura-dsp compile_graph]
-  compile --> unit[FunDSP AudioUnit]
-  unit --> render[aura-render]
-```
+Music nodes (`minor_arpeggio`, `note_at_time`, …) delegate to composition crates at **translate time**. Sample-time evaluation uses precomputed schedule tables — timing remains explicit via the `time` signal.
 
 ### Real-time playback (deferred)
 
-```mermaid
-flowchart LR
-  app[Application] --> dsp[aura-dsp graph]
-  app --> cpal[aura-io-cpal]
-  cpal --> device[Audio device]
-  dsp --> cpal
-```
-
-Both offline paths may share FunDSP `AudioUnit` graphs where applicable. Whole-graph render uses `Wave::render`; per-note v1 sampling mixes buffers directly. Real-time will use block `AudioUnit::process` into CPAL callback buffers.
+Future CPAL output will call the same `Sampler::at(t)` functions (or block variants) as offline rendering.
 
 ## Considerations
 
-- **Real-time audio** — low-latency output may constrain architecture; deferred in WSL/devcontainer
-- **Determinism** — offline rendering must be reproducible from a given seed; see [`notation-synthesis.md`](notation-synthesis.md)
+- **Real-time audio** — deferred in WSL/devcontainer
+- **Determinism** — pure `f(t)` sampling; see [`notation-synthesis.md`](notation-synthesis.md)
 - **Modularity** — composition, scheduling, instrumentation, and synthesis are separable via crate boundaries
-- **Performance** — synthesis and rendering are likely CPU-intensive
 
 ## Open questions
 
-- Imp graph per voice for complex instruments
-- Whether to add `hound` for finer-grained WAV/CPAL interop
+- Buffer/block sampling optimizations without breaking FP semantics
+- Graph-owned duration vs external render parameters
 - Live scheduler parity with offline lookahead

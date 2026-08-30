@@ -1,0 +1,112 @@
+{
+  "nodes": {
+    "time": {
+      "id": "time",
+      "type": "time",
+      "inputs": {}
+    },
+    "arp": {
+      "id": "arp",
+      "type": "minor_arpeggio",
+      "inputs": {}
+    },
+    "note": {
+      "id": "note",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "pitch": {
+      "id": "pitch",
+      "type": "pitch_to_hz",
+      "inputs": {}
+    },
+    "start": {
+      "id": "start",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "elapsed": {
+      "id": "elapsed",
+      "type": "time_elapsed",
+      "inputs": {}
+    },
+    "env": {
+      "id": "env",
+      "type": "note_envelope",
+      "inputs": {}
+    },
+    "osc": {
+      "id": "osc",
+      "type": "sine",
+      "inputs": {}
+    },
+    "voice": {
+      "id": "voice",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "out": {
+      "id": "out",
+      "type": "output",
+      "inputs": {}
+    }
+  },
+  "edges": {
+    "arp_to_note_score": {
+      "from": { "node": "arp", "port": "score" },
+      "to": { "node": "note", "port": "score" }
+    },
+    "arp_to_start_score": {
+      "from": { "node": "arp", "port": "score" },
+      "to": { "node": "start", "port": "score" }
+    },
+    "arp_to_env_score": {
+      "from": { "node": "arp", "port": "score" },
+      "to": { "node": "env", "port": "score" }
+    },
+    "time_to_note": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "note", "port": "time" }
+    },
+    "time_to_start": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "start", "port": "time" }
+    },
+    "time_to_env": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "env", "port": "time" }
+    },
+    "time_to_elapsed": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "elapsed", "port": "time" }
+    },
+    "note_pitch_to_pitch": {
+      "from": { "node": "note", "port": "pitch" },
+      "to": { "node": "pitch", "port": "pitch" }
+    },
+    "pitch_to_osc": {
+      "from": { "node": "pitch", "port": "frequency" },
+      "to": { "node": "osc", "port": "frequency" }
+    },
+    "start_to_elapsed": {
+      "from": { "node": "start", "port": "note_start" },
+      "to": { "node": "elapsed", "port": "start" }
+    },
+    "elapsed_to_osc": {
+      "from": { "node": "elapsed", "port": "elapsed" },
+      "to": { "node": "osc", "port": "time" }
+    },
+    "osc_to_voice_a": {
+      "from": { "node": "osc", "port": "audio" },
+      "to": { "node": "voice", "port": "a" }
+    },
+    "env_to_voice_b": {
+      "from": { "node": "env", "port": "value" },
+      "to": { "node": "voice", "port": "b" }
+    },
+    "voice_to_out": {
+      "from": { "node": "voice", "port": "audio" },
+      "to": { "node": "out", "port": "value" }
+    }
+  }
+}

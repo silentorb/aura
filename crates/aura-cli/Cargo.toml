@@ -10,11 +10,8 @@ name = "aura"
 path = "src/main.rs"
 
 [dependencies]
-aura-dsp = { path = "../aura-dsp" }
-aura-io-wav = { path = "../aura-io-wav" }
-aura-render = { path = "../aura-render" }
+aura-integration = { path = "../aura-integration" }
 aura-sample = { path = "../aura-sample" }
-fundsp = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

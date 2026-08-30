@@ -9,17 +9,16 @@ Aura is a library-first framework for procedural music. Specialized programs com
 ## Goals
 
 - Express music as procedural, reusable patterns rather than destructive stored sequences
-- Sample each note as an independent instrument instance by default
+- Model synthesis as pure **Time → Sample** functions via Imp graphs
 - Support deterministic offline rendering with optional future-aware scheduling
 - Keep integration at the surface; core crates stay focused
 
-See [`notation-synthesis.md`](../design/notation-synthesis.md) for integration rules.
+See [`notation-synthesis.md`](../design/notation-synthesis.md) and [`imp-execution.md`](../design/imp-execution.md).
 
 ## Non-goals
 
-- General-purpose CLI tool in v1 (`aura-cli` deferred)
 - Live CPAL playback until the dev environment supports it reliably
-- Full Imp-graph-per-note instruments in v1
+- Stock `imp_execution` or FunDSP for Aura's primary sampler path
 
 ## Core domains
 
@@ -28,13 +27,14 @@ See [`notation-synthesis.md`](../design/notation-synthesis.md) for integration r
 | Composition | Notation types (`aura-composition`) and generators (`aura-composer`) |
 | Sequencing | Offline scheduling (`aura-scheduler`); live dispatch deferred |
 | Instrumentation | Per-note sampling and mix-down (`aura-instrumentation`) |
-| Synthesis | FunDSP-based audio graph construction (`aura-dsp`, `aura-imp`) |
-| Rendering | Offline WAV export; whole-graph and per-note paths |
+| Synthesis | Imp graphs (`aura-imp`) and pure DSP (`aura-dsp`) |
+| Integration | Graph translation and sampling (`aura-integration`) |
+| Rendering | Offline WAV export via thin CLI and demo scripts |
 
 ### Rendering (initial scope)
 
-- Generate audio offline via FunDSP or per-note PCM mix-down.
-- Write 32-bit float WAV files to an untracked `output/` directory via `aura-demo`.
+- Load Imp JSON graphs; translate to `Sampler`; sample over a specified duration.
+- Write 32-bit float WAV files to untracked `output/` via `aura-cli` or [`demos/render-all.sh`](../../demos/render-all.sh).
 - Real-time playback via CPAL is planned but deferred.
 
 ### Integration requirements
@@ -49,4 +49,5 @@ See [`notation-synthesis.md`](../design/notation-synthesis.md) for integration r
 ## Open questions
 
 - Live vs offline parity when lookahead is unavailable
-- Imp vs direct FunDSP for simple instruments
+- Graph-owned duration vs external render parameters
+- Buffer sampling optimizations preserving FP semantics

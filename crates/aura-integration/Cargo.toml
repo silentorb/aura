@@ -1,23 +1,21 @@
 [package]
-name = "aura-demo"
-description = "Surface integration reference program for Aura"
+name = "aura-integration"
+description = "Surface integration: Imp graph translation and sampling for Aura"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[[bin]]
-name = "aura-demo"
-path = "src/main.rs"
-
 [dependencies]
 aura-composer = { path = "../aura-composer" }
+aura-composition = { path = "../aura-composition" }
 aura-dsp = { path = "../aura-dsp" }
+aura-imp = { path = "../aura-imp" }
 aura-instrumentation = { path = "../aura-instrumentation" }
 aura-io-wav = { path = "../aura-io-wav" }
 aura-render = { path = "../aura-render" }
 aura-sample = { path = "../aura-sample" }
 aura-scheduler = { path = "../aura-scheduler" }
-fundsp = { workspace = true }
+serde_json = "1"
 thiserror = { workspace = true }
 
 [dev-dependencies]
