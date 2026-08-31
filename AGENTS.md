@@ -24,7 +24,7 @@ These apply once a Rust crate scaffold exists.
 
 ## Demo artifacts
 
-The listenable outputs in [`output/`](output/) (`sine.wav`, `arpeggio.wav`) are the primary artifacts for verifying demos by ear. They are gitignored but must stay current in the workspace.
+The listenable output in [`output/`](output/) (`demo-01.wav`) is the primary artifact for verifying demos by ear. They are gitignored but must stay current in the workspace.
 
 After any change to demo graphs (`demos/*.json`), [`demos/render-all.sh`](demos/render-all.sh), or code that affects how those graphs render (composition, integration, imp nodes, CLI, etc.), regenerate them:
 

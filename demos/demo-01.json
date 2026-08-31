@@ -203,6 +203,112 @@
       "type": "add",
       "inputs": {}
     },
+    "bass": {
+      "id": "bass",
+      "type": "bass_line",
+      "inputs": {}
+    },
+    "loop_bass": {
+      "id": "loop_bass",
+      "type": "loop",
+      "inputs": {}
+    },
+    "bass_note": {
+      "id": "bass_note",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "bass_start": {
+      "id": "bass_start",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "bass_dur": {
+      "id": "bass_dur",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "bass_elapsed": {
+      "id": "bass_elapsed",
+      "type": "time_elapsed",
+      "inputs": {}
+    },
+    "bass_hz": {
+      "id": "bass_hz",
+      "type": "semitone_to_hz",
+      "inputs": {}
+    },
+    "bass_cutoff_base": {
+      "id": "bass_cutoff_base",
+      "type": "parameter",
+      "inputs": {
+        "value": 800.0
+      }
+    },
+    "bass_cutoff_mult": {
+      "id": "bass_cutoff_mult",
+      "type": "note_param_at_time",
+      "inputs": {
+        "param": "cutoff_mult"
+      }
+    },
+    "bass_cutoff_env": {
+      "id": "bass_cutoff_env",
+      "type": "linear_adsr",
+      "inputs": {
+        "attack": 0.002,
+        "decay": 0.08,
+        "sustain": 0.3,
+        "release": 0.02
+      }
+    },
+    "bass_cutoff_mul1": {
+      "id": "bass_cutoff_mul1",
+      "type": "multiply_control",
+      "inputs": {}
+    },
+    "bass_cutoff": {
+      "id": "bass_cutoff",
+      "type": "multiply_control",
+      "inputs": {}
+    },
+    "bass_amp_env": {
+      "id": "bass_amp_env",
+      "type": "linear_adsr",
+      "inputs": {
+        "attack": 0.005,
+        "decay": 0.06,
+        "sustain": 0.15,
+        "release": 0.03
+      }
+    },
+    "bass_osc": {
+      "id": "bass_osc",
+      "type": "bandlimited_saw",
+      "inputs": {}
+    },
+    "bass_voice": {
+      "id": "bass_voice",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "bass_gain": {
+      "id": "bass_gain",
+      "type": "parameter",
+      "inputs": {
+        "value": 0.55
+      }
+    },
+    "bass_out": {
+      "id": "bass_out",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "mix_final": {
+      "id": "mix_final",
+      "type": "add",
+      "inputs": {}
+    },
     "out": {
       "id": "out",
       "type": "output",
@@ -434,8 +540,136 @@
       "from": { "node": "snare_out", "port": "audio" },
       "to": { "node": "mix_all", "port": "b" }
     },
-    "mix_all_to_out": {
+    "tempo_to_bass": {
+      "from": { "node": "tempo", "port": "tempo" },
+      "to": { "node": "bass", "port": "tempo" }
+    },
+    "meter_to_bass": {
+      "from": { "node": "meter", "port": "time_signature" },
+      "to": { "node": "bass", "port": "time_signature" }
+    },
+    "loop_prog_to_bass": {
+      "from": { "node": "loop_prog", "port": "value" },
+      "to": { "node": "bass", "port": "progression" }
+    },
+    "bass_to_loop_bass": {
+      "from": { "node": "bass", "port": "score" },
+      "to": { "node": "loop_bass", "port": "value" }
+    },
+    "loop_bass_to_bass_note_score": {
+      "from": { "node": "loop_bass", "port": "value" },
+      "to": { "node": "bass_note", "port": "score" }
+    },
+    "loop_bass_to_bass_start_score": {
+      "from": { "node": "loop_bass", "port": "value" },
+      "to": { "node": "bass_start", "port": "score" }
+    },
+    "loop_bass_to_bass_dur_score": {
+      "from": { "node": "loop_bass", "port": "value" },
+      "to": { "node": "bass_dur", "port": "score" }
+    },
+    "loop_bass_to_bass_cutoff_mult_score": {
+      "from": { "node": "loop_bass", "port": "value" },
+      "to": { "node": "bass_cutoff_mult", "port": "score" }
+    },
+    "time_to_bass_note": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "bass_note", "port": "time" }
+    },
+    "time_to_bass_start": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "bass_start", "port": "time" }
+    },
+    "time_to_bass_dur": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "bass_dur", "port": "time" }
+    },
+    "time_to_bass_cutoff_mult": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "bass_cutoff_mult", "port": "time" }
+    },
+    "bass_note_to_bass_hz": {
+      "from": { "node": "bass_note", "port": "semitone" },
+      "to": { "node": "bass_hz", "port": "semitone" }
+    },
+    "bass_hz_to_bass_osc_freq": {
+      "from": { "node": "bass_hz", "port": "frequency" },
+      "to": { "node": "bass_osc", "port": "frequency" }
+    },
+    "bass_start_to_bass_elapsed": {
+      "from": { "node": "bass_start", "port": "note_start" },
+      "to": { "node": "bass_elapsed", "port": "start" }
+    },
+    "time_to_bass_elapsed": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "bass_elapsed", "port": "time" }
+    },
+    "bass_elapsed_to_bass_osc": {
+      "from": { "node": "bass_elapsed", "port": "elapsed" },
+      "to": { "node": "bass_osc", "port": "elapsed" }
+    },
+    "bass_elapsed_to_bass_amp_env": {
+      "from": { "node": "bass_elapsed", "port": "elapsed" },
+      "to": { "node": "bass_amp_env", "port": "elapsed" }
+    },
+    "bass_elapsed_to_bass_cutoff_env": {
+      "from": { "node": "bass_elapsed", "port": "elapsed" },
+      "to": { "node": "bass_cutoff_env", "port": "elapsed" }
+    },
+    "bass_dur_to_bass_amp_env": {
+      "from": { "node": "bass_dur", "port": "note_duration" },
+      "to": { "node": "bass_amp_env", "port": "note_duration" }
+    },
+    "bass_dur_to_bass_cutoff_env": {
+      "from": { "node": "bass_dur", "port": "note_duration" },
+      "to": { "node": "bass_cutoff_env", "port": "note_duration" }
+    },
+    "bass_cutoff_base_to_mul1_a": {
+      "from": { "node": "bass_cutoff_base", "port": "value" },
+      "to": { "node": "bass_cutoff_mul1", "port": "a" }
+    },
+    "bass_cutoff_mult_to_mul1_b": {
+      "from": { "node": "bass_cutoff_mult", "port": "value" },
+      "to": { "node": "bass_cutoff_mul1", "port": "b" }
+    },
+    "bass_cutoff_mul1_to_cutoff_a": {
+      "from": { "node": "bass_cutoff_mul1", "port": "value" },
+      "to": { "node": "bass_cutoff", "port": "a" }
+    },
+    "bass_cutoff_env_to_cutoff_b": {
+      "from": { "node": "bass_cutoff_env", "port": "value" },
+      "to": { "node": "bass_cutoff", "port": "b" }
+    },
+    "bass_cutoff_to_bass_osc": {
+      "from": { "node": "bass_cutoff", "port": "value" },
+      "to": { "node": "bass_osc", "port": "cutoff" }
+    },
+    "bass_osc_to_bass_voice_a": {
+      "from": { "node": "bass_osc", "port": "audio" },
+      "to": { "node": "bass_voice", "port": "a" }
+    },
+    "bass_amp_env_to_bass_voice_b": {
+      "from": { "node": "bass_amp_env", "port": "value" },
+      "to": { "node": "bass_voice", "port": "b" }
+    },
+    "bass_voice_to_bass_out_a": {
+      "from": { "node": "bass_voice", "port": "audio" },
+      "to": { "node": "bass_out", "port": "a" }
+    },
+    "bass_gain_to_bass_out_b": {
+      "from": { "node": "bass_gain", "port": "value" },
+      "to": { "node": "bass_out", "port": "b" }
+    },
+    "mix_all_to_mix_final_a": {
       "from": { "node": "mix_all", "port": "audio" },
+      "to": { "node": "mix_final", "port": "a" }
+    },
+    "bass_out_to_mix_final_b": {
+      "from": { "node": "bass_out", "port": "audio" },
+      "to": { "node": "mix_final", "port": "b" }
+    },
+    "mix_final_to_out": {
+      "from": { "node": "mix_final", "port": "audio" },
       "to": { "node": "out", "port": "value" }
     }
   }

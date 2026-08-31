@@ -306,8 +306,13 @@ impl NaturalMinor {
     }
 }
 
-/// Per-note custom parameters (extensible stub for v1).
+/// Per-note custom parameters keyed by name (heterogeneous by key, uniform f64 values).
 pub type NoteParams = HashMap<String, f64>;
+
+/// Well-known per-note parameter keys.
+pub mod note_params {
+    pub const CUTOFF_MULT: &str = "cutoff_mult";
+}
 
 /// A single note event in beat time.
 #[derive(Debug, Clone, PartialEq)]
@@ -329,6 +334,20 @@ impl NoteEvent {
             params: NoteParams::new(),
         }
     }
+
+    pub fn with_velocity(mut self, velocity: f32) -> Self {
+        self.velocity = velocity;
+        self
+    }
+
+    pub fn with_param(mut self, key: &str, value: f64) -> Self {
+        self.params.insert(key.to_string(), value);
+        self
+    }
+
+    pub fn param_or(&self, key: &str, default: f64) -> f64 {
+        self.params.get(key).copied().unwrap_or(default)
+    }
 }
 
 /// A score: tempo, meter, and ordered note events.
@@ -337,6 +356,8 @@ pub struct Score {
     pub time_signature: TimeSignature,
     pub tempo: Tempo,
     pub events: Vec<NoteEvent>,
+    /// Musical loop period in beats. When unset, loops use content end (`duration_beats`).
+    pub cycle_beats: Option<f64>,
 }
 
 impl Score {
@@ -345,7 +366,19 @@ impl Score {
             time_signature,
             tempo,
             events,
+            cycle_beats: None,
         }
+    }
+
+    pub fn with_cycle_beats(mut self, cycle_beats: f64) -> Self {
+        self.cycle_beats = Some(cycle_beats);
+        self
+    }
+
+    /// Sets loop cycle length in whole measures (bars) at the score time signature.
+    pub fn with_cycle_measures(mut self, measures: f64) -> Self {
+        self.cycle_beats = Some(measures * self.time_signature.quarter_beats_per_bar());
+        self
     }
 
     /// Total duration in beats (end of last event).
@@ -354,6 +387,16 @@ impl Score {
             .iter()
             .map(|e| e.start_beats + e.duration_beats)
             .fold(0.0_f64, f64::max)
+    }
+
+    /// Beat length of one loop cycle for pattern repetition.
+    pub fn loop_cycle_beats(&self) -> f64 {
+        self.cycle_beats.unwrap_or_else(|| self.duration_beats())
+    }
+
+    /// Loop cycle length in seconds at the score tempo.
+    pub fn loop_cycle_secs(&self) -> f64 {
+        beats_to_seconds(self.loop_cycle_beats(), self.tempo)
     }
 
     /// Total duration in seconds at the score tempo.
@@ -427,6 +470,35 @@ mod tests {
         };
         assert_eq!(progression.chord_at_beats(0.0).root.0, 57);
         assert_eq!(progression.chord_at_beats(4.0).root.0, 65);
+    }
+
+    #[test]
+    fn note_event_param_or_returns_default_when_missing() {
+        let event = NoteEvent::new(Semitone(36), 0.0, 0.5);
+        assert!((event.param_or(note_params::CUTOFF_MULT, 1.0) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn note_event_with_param_stores_value() {
+        let event = NoteEvent::new(Semitone(36), 0.0, 0.5)
+            .with_param(note_params::CUTOFF_MULT, 0.95);
+        assert!((event.param_or(note_params::CUTOFF_MULT, 1.0) - 0.95).abs() < 1e-9);
+    }
+
+    #[test]
+    fn note_event_with_velocity_stores_value() {
+        let event = NoteEvent::new(Semitone(36), 0.0, 0.5).with_velocity(0.8);
+        assert!((event.velocity - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn score_loop_cycle_defaults_to_content_duration() {
+        let score = Score::new(
+            TimeSignature::FOUR_FOUR,
+            Tempo::default(),
+            vec![NoteEvent::new(Semitone(60), 0.0, 1.0)],
+        );
+        assert!((score.loop_cycle_beats() - 1.0).abs() < 1e-9);
     }
 
     #[test]

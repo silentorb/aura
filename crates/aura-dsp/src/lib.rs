@@ -51,6 +51,36 @@ pub fn multiply(a: f32, b: f32) -> f32 {
     a * b
 }
 
+/// Pure band-limited rising saw: `2 * fract(frequency * elapsed) - 1`.
+#[must_use]
+pub fn saw(frequency: f32, elapsed: f64) -> f32 {
+    if elapsed <= 0.0 {
+        return 0.0;
+    }
+    let phase = f64::from(frequency) * elapsed;
+    let frac = phase - phase.floor();
+    (2.0 * frac - 1.0) as f32
+}
+
+/// Band-limited saw via Fourier partial sum up to `cutoff_hz`.
+#[must_use]
+pub fn bandlimited_saw(frequency: f32, elapsed: f64, cutoff_hz: f32) -> f32 {
+    if elapsed <= 0.0 || frequency <= 0.0 || cutoff_hz <= 0.0 {
+        return 0.0;
+    }
+
+    let max_harmonic = (cutoff_hz / frequency).floor().max(1.0) as u32;
+    let mut sum = 0.0_f64;
+    for n in 1..=max_harmonic {
+        let harmonic = n as f64;
+        if harmonic * f64::from(frequency) >= f64::from(cutoff_hz) {
+            break;
+        }
+        sum += (2.0 / harmonic) * (TAU * harmonic * f64::from(frequency) * elapsed).sin();
+    }
+    sum as f32
+}
+
 /// Sums two mono samples.
 #[must_use]
 pub fn add(a: f32, b: f32) -> f32 {
@@ -136,5 +166,31 @@ mod tests {
     #[test]
     fn add_sums_samples() {
         assert_eq!(add(0.25, 0.75), 1.0);
+    }
+
+    #[test]
+    fn saw_is_pure_in_time() {
+        let a = saw(110.0, 0.05);
+        let b = saw(110.0, 0.05);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn saw_is_silent_at_zero() {
+        assert_eq!(saw(110.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn bandlimited_saw_is_pure() {
+        let a = bandlimited_saw(110.0, 0.05, 800.0);
+        let b = bandlimited_saw(110.0, 0.05, 800.0);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn bandlimited_saw_is_brighter_at_higher_cutoff() {
+        let low = bandlimited_saw(110.0, 0.05, 220.0).abs();
+        let high = bandlimited_saw(110.0, 0.05, 2000.0).abs();
+        assert!(high > low);
     }
 }

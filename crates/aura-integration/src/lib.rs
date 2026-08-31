@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn render_arpeggio_graph_matches_expected_frames() {
-        let json = include_str!("../../../demos/arpeggio.json");
+        let json = include_str!("../../../demos/demo-01.json");
         let graph = aura_imp::graph_from_json_str(json).expect("graph");
         let spec = SampleSpec {
             sample_rate: SampleRate::RATE_44100,

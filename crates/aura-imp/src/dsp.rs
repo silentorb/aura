@@ -116,6 +116,53 @@ pub fn dsp_node_library() -> NodeLibrary {
         },
     );
     types.insert(
+        "bandlimited_saw".into(),
+        NodeType {
+            id: "bandlimited_saw".into(),
+            type_params: Vec::new(),
+            implementation: None,
+            inputs: BTreeMap::from([
+                (
+                    "frequency".into(),
+                    port(
+                        "frequency",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(110.0)),
+                    ),
+                ),
+                ("elapsed".into(), port("elapsed", time.clone(), None)),
+                (
+                    "cutoff".into(),
+                    port(
+                        "cutoff",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(800.0)),
+                    ),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "audio".into(),
+                port("audio", audio_mono.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "multiply_control".into(),
+        NodeType {
+            id: "multiply_control".into(),
+            type_params: Vec::new(),
+            implementation: None,
+            inputs: BTreeMap::from([
+                ("a".into(), port("a", control.clone(), None)),
+                ("b".into(), port("b", control.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([(
+                "value".into(),
+                port("value", control.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
         "multiply".into(),
         NodeType {
             id: "multiply".into(),
@@ -167,5 +214,6 @@ mod tests {
         assert!(library.types.contains_key("exponential_sweep_sine"));
         assert!(library.types.contains_key("deterministic_noise"));
         assert!(library.types.contains_key("highpass_noise"));
+        assert!(library.types.contains_key("bandlimited_saw"));
     }
 }

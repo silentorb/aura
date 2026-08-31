@@ -216,6 +216,10 @@ pub fn music_node_library() -> NodeLibrary {
                     port("active", control.clone(), None),
                 ),
                 (
+                    "velocity".into(),
+                    port("velocity", control.clone(), None),
+                ),
+                (
                     "note_start".into(),
                     port("note_start", time.clone(), None),
                 ),
@@ -224,6 +228,72 @@ pub fn music_node_library() -> NodeLibrary {
                     port("note_duration", time.clone(), None),
                 ),
             ]),
+        },
+    );
+    types.insert(
+        "note_param_at_time".into(),
+        NodeType {
+            id: "note_param_at_time".into(),
+            type_params: Vec::new(),
+            implementation: None,
+            inputs: BTreeMap::from([
+                ("score".into(), port("score", score.clone(), None)),
+                ("time".into(), port("time", time.clone(), None)),
+                (
+                    "param".into(),
+                    port(
+                        "param",
+                        control.clone(),
+                        Some(PrimitiveValue::String("cutoff_mult".into())),
+                    ),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "value".into(),
+                port("value", control.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "bass_line".into(),
+        NodeType {
+            id: "bass_line".into(),
+            type_params: Vec::new(),
+            implementation: None,
+            inputs: BTreeMap::from([
+                (
+                    "progression".into(),
+                    port("progression", progression.clone(), None),
+                ),
+                (
+                    "tempo".into(),
+                    port("tempo", tempo.clone(), None),
+                ),
+                (
+                    "time_signature".into(),
+                    port("time_signature", time_signature.clone(), None),
+                ),
+                (
+                    "subdivision".into(),
+                    port(
+                        "subdivision",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(8.0)),
+                    ),
+                ),
+                (
+                    "octave_offset".into(),
+                    port(
+                        "octave_offset",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(-24.0)),
+                    ),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "score".into(),
+                port("score", score.clone(), None),
+            )]),
         },
     );
     types.insert(

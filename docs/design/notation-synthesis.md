@@ -41,7 +41,7 @@ flowchart LR
 1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
 2. **Translation** — `translate_graph` composes pure `Sampler` closures.
 3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
-4. **Notation path** — `arpeggio`, `drum_grid`, `epic_minor_progression`, `loop`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; generators emit **one cycle**; `loop` compositors repeat via modulus for the render duration.
+4. **Notation path** — `arpeggio`, `drum_grid`, `epic_minor_progression`, `loop`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; generators emit **one cycle** measured in **bars**; `loop` compositors repeat via beat/measure modulus at sample time (not seconds).
 5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules
@@ -49,6 +49,8 @@ flowchart LR
 ### Rule 1: Per-note instances
 
 By default, each note is sampled as a **distinct instrument instance**, independent of other notes. Instrument parameter changes are **per note**, not global. Like MIDI velocity, each note may carry custom parameters and its own envelope.
+
+**Per-note parameters (`NoteParams`):** Each `NoteEvent` carries an extensible `HashMap<String, f64>` of custom parameters (e.g. `cutoff_mult` via [`note_params::CUTOFF_MULT`](../../crates/aura-composition/src/lib.rs)). Generators attach params at composition time; [`NoteSchedule`](../../crates/aura-integration/src/translate/note_schedule.rs) preserves velocity and params through the Imp path. Loop repetition wraps **beat time** over each score's measure-aligned `cycle_beats` (from `Score::with_cycle_measures`), then converts to seconds at the wired tempo. Graphs read params at sample time via the `note_param_at_time` node (translate-time `param` literal names the key) or the `velocity` output on `note_at_time`.
 
 ### Rule 2: Future-aware sampling
 
@@ -82,6 +84,14 @@ Percussion in the arpeggio demo uses **separate scores per lane** (kick and snar
 - **Snare** — deterministic noise through a **stateless high-pass** (`noise(t) - noise(t - dt)`), not an IIR filter, to stay compatible with seekable pure `f(t)` sampling ([ADR 0007](../decisions/0007-drop-fundsp.md)).
 
 Drum hits use `NoteEvent` timing only; semitone is unused on drum lanes.
+
+## Bass voice in Imp graphs
+
+The demo-01 graph adds a chugging synth bass on eighth notes via the `bass_line` generator. Each note carries a `cutoff_mult` param; the voice chain uses `bandlimited_saw` (Fourier partial-sum low-pass) with cutoff driven by base frequency × per-note multiplier × filter ADSR, plus a separate amplitude ADSR.
+
+- **Oscillator** — `bandlimited_saw` (stateless harmonic roll-off, compatible with seekable pure `f(t)` sampling).
+- **Filter envelope** — `linear_adsr` on cutoff; per-note variation from `note_param_at_time`.
+- **Mixing** — bass lane mixed with arpeggio and drums via `add`.
 
 ## Ontology
 

@@ -1,7 +1,8 @@
 //! Procedural composition generators for Aura.
 
 use aura_composition::{
-    ChordProgression, ChordRegion, NaturalMinor, NoteEvent, Score, Semitone, Tempo, TimeSignature,
+    note_params, ChordProgression, ChordRegion, NaturalMinor, NoteEvent, Score, Semitone, Tempo,
+    TimeSignature,
 };
 
 /// Configuration for a progression-driven arpeggio generator.
@@ -76,6 +77,60 @@ pub fn arpeggio(config: ArpeggioConfig) -> Score {
     }
 
     Score::new(config.time_signature, config.tempo, events)
+        .with_cycle_measures(total_beats / beats_per_bar)
+}
+
+/// Configuration for a progression-driven chugging bass line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BassLineConfig {
+    pub progression: ChordProgression,
+    pub tempo: Tempo,
+    pub time_signature: TimeSignature,
+    /// Subdivision of a whole note (8 = eighth notes).
+    pub subdivision: u8,
+    /// Semitone offset applied to each chord root (e.g. -24 for two octaves down).
+    pub octave_offset: i16,
+}
+
+impl Default for BassLineConfig {
+    fn default() -> Self {
+        Self {
+            progression: epic_minor_progression(Semitone::A3, 1, TimeSignature::FOUR_FOUR),
+            tempo: Tempo::default(),
+            time_signature: TimeSignature::FOUR_FOUR,
+            subdivision: 8,
+            octave_offset: -24,
+        }
+    }
+}
+
+/// Generates a chugging bass line: chord root on every eighth note with per-note cutoff variation.
+pub fn bass_line(config: BassLineConfig) -> Score {
+    let note_duration_beats = (4.0 / f64::from(config.subdivision)) * 0.4;
+    let step_beats = 4.0 / f64::from(config.subdivision);
+    let total_beats = config.progression.duration_beats();
+    let beats_per_bar = config.time_signature.quarter_beats_per_bar();
+
+    let mut events = Vec::new();
+    let mut beat = 0.0;
+
+    while beat < total_beats - 1e-9 {
+        let chord = config.progression.chord_at_beats(beat);
+        let semitone = chord.root.transpose(config.octave_offset);
+        let beat_in_bar = beat % beats_per_bar;
+        let position_in_bar = (beat_in_bar / step_beats).round() as u32;
+        let cutoff_mult = 0.88 + 0.24 * (position_in_bar as f64 / 7.0);
+
+        events.push(
+            NoteEvent::new(semitone, beat, note_duration_beats)
+                .with_param(note_params::CUTOFF_MULT, cutoff_mult),
+        );
+
+        beat += step_beats;
+    }
+
+    Score::new(config.time_signature, config.tempo, events)
+        .with_cycle_measures(total_beats / beats_per_bar)
 }
 
 /// Drum lane for alternating kick/snare on a quarter-note grid.
@@ -135,7 +190,7 @@ pub fn drum_grid(config: DrumGridConfig) -> Score {
         beat_index += 1;
     }
 
-    Score::new(config.time_signature, config.tempo, events)
+    Score::new(config.time_signature, config.tempo, events).with_cycle_measures(1.0)
 }
 
 #[cfg(test)]
@@ -231,6 +286,40 @@ mod tests {
     }
 
     #[test]
+    fn bass_line_emits_eighth_notes_one_cycle() {
+        let score = bass_line(BassLineConfig::default());
+        // 4 bars × 8 eighth notes per bar = 32 events
+        assert_eq!(score.events.len(), 32);
+    }
+
+    #[test]
+    fn bass_line_start_times_are_monotonic() {
+        let score = bass_line(BassLineConfig::default());
+        for window in score.events.windows(2) {
+            assert!(window[1].start_beats > window[0].start_beats);
+        }
+    }
+
+    #[test]
+    fn bass_line_sets_cutoff_mult_param() {
+        let score = bass_line(BassLineConfig::default());
+        assert!(score.events[0].param_or(note_params::CUTOFF_MULT, 0.0) > 0.0);
+        assert!(
+            score.events[0].param_or(note_params::CUTOFF_MULT, 0.0)
+                != score.events[7].param_or(note_params::CUTOFF_MULT, 0.0)
+        );
+    }
+
+    #[test]
+    fn bass_line_uses_chord_roots() {
+        let score = bass_line(BassLineConfig::default());
+        let progression = epic_minor_progression(Semitone::A3, 1, TimeSignature::FOUR_FOUR);
+        let first = &score.events[0];
+        let root = progression.chord_at_beats(0.0).root.transpose(-24);
+        assert_eq!(first.semitone.0, root.0);
+    }
+
+    #[test]
     fn drum_grid_kick_emits_on_even_beats_one_bar() {
         let score = drum_grid(DrumGridConfig {
             lane: DrumLane::Kick,
@@ -250,6 +339,22 @@ mod tests {
         assert_eq!(score.events.len(), 2);
         let starts: Vec<f64> = score.events.iter().map(|e| e.start_beats).collect();
         assert_eq!(starts, vec![1.0, 3.0]);
+    }
+
+    #[test]
+    fn drum_grid_loop_cycle_is_one_measure() {
+        let score = drum_grid(DrumGridConfig {
+            lane: DrumLane::Kick,
+            ..Default::default()
+        });
+        assert!((score.loop_cycle_beats() - 4.0).abs() < 1e-9);
+        assert!((score.duration_beats() - 2.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn bass_line_loop_cycle_is_four_measures() {
+        let score = bass_line(BassLineConfig::default());
+        assert!((score.loop_cycle_beats() - 16.0).abs() < 1e-9);
     }
 
     #[test]

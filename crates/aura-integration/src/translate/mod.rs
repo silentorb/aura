@@ -3,12 +3,18 @@
 mod note_schedule;
 
 use note_schedule::NoteSchedule;
-use aura_composer::{arpeggio, drum_grid, epic_minor_progression, ArpeggioConfig, DrumGridConfig, DrumLane};
+use aura_composer::{
+    arpeggio, bass_line, drum_grid, epic_minor_progression, ArpeggioConfig, BassLineConfig,
+    DrumGridConfig, DrumLane,
+};
 use aura_composition::{
     ChordProgression, ChordSignal, ProgressionSignal, Score, ScoreSignal, Semitone, Tempo,
     TimeSignature,
 };
-use aura_dsp::{add, deterministic_noise, exponential_sweep_sine, highpass_noise, multiply, sine};
+use aura_dsp::{
+    add, bandlimited_saw, deterministic_noise, exponential_sweep_sine, highpass_noise, multiply,
+    sine,
+};
 use aura_imp::{Graph, Node, NodeId, PortReference, PrimitiveValue, Registry};
 use aura_instrumentation::LinearAdsr;
 use aura_render::Sampler;
@@ -33,6 +39,8 @@ pub enum TranslateError {
     CycleDetected { node: NodeId },
     #[error("expected numeric literal on node `{node}` port `{port}`")]
     ExpectedNumber { node: NodeId, port: String },
+    #[error("expected string literal on node `{node}` port `{port}`")]
+    ExpectedString { node: NodeId, port: String },
     #[error("node `{node}` output `{port}` is not available")]
     MissingOutputPort { node: NodeId, port: String },
     #[error("score input on node `{node}` must connect to a score-producing node")]
@@ -228,6 +236,27 @@ fn translate_node(
             )?;
             Ok(NodeValue::Signal(Box::new(MultiplySampler { a, b })))
         }
+        "multiply_control" => {
+            let a = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "a",
+            )?;
+            let b = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "b",
+            )?;
+            Ok(NodeValue::Signal(Box::new(MultiplyControlSampler { a, b })))
+        }
         "add" => {
             let a = signal_input(
                 graph,
@@ -333,6 +362,40 @@ fn translate_node(
                 "dt",
             )?;
             Ok(NodeValue::Signal(Box::new(HighpassNoiseSampler { seed, time, dt })))
+        }
+        "bandlimited_saw" => {
+            let frequency = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "frequency",
+            )?;
+            let elapsed = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "elapsed",
+            )?;
+            let cutoff = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "cutoff",
+            )?;
+            Ok(NodeValue::Signal(Box::new(BandlimitedSawSampler {
+                frequency,
+                elapsed,
+                cutoff,
+            })))
         }
         "linear_adsr" => {
             let attack = signal_input(
@@ -450,6 +513,14 @@ fn translate_node(
             visiting,
             node,
         )?))),
+        "bass_line" => Ok(NodeValue::ScoreSignal(ScoreSignal::finite(build_bass_line_score(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node,
+        )?))),
         "drum_grid" => Ok(NodeValue::ScoreSignal(ScoreSignal::finite(build_drum_grid_score(
             graph,
             registry,
@@ -473,6 +544,15 @@ fn translate_node(
             edges_by_target,
             visiting,
             node_id,
+            output_port,
+        ),
+        "note_param_at_time" => translate_note_param_at_time_port(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node,
             output_port,
         ),
         "chord_at_time" => translate_chord_at_time_port(
@@ -536,6 +616,7 @@ fn translate_note_at_time_port(
     let sampler: Box<dyn Sampler> = match output_port {
         "semitone" => Box::new(NoteSemitoneSampler { schedule }),
         "active" => Box::new(NoteActiveSampler { schedule }),
+        "velocity" => Box::new(NoteVelocitySampler { schedule }),
         "note_start" => Box::new(NoteStartSampler { schedule }),
         "note_duration" => Box::new(NoteDurationSampler { schedule }),
         _ => {
@@ -547,6 +628,40 @@ fn translate_note_at_time_port(
     };
 
     Ok(NodeValue::Signal(sampler))
+}
+
+fn translate_note_param_at_time_port(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node: &Node,
+    output_port: &str,
+) -> Result<NodeValue, TranslateError> {
+    if output_port != "value" {
+        return Err(TranslateError::MissingOutputPort {
+            node: node.id.clone(),
+            port: output_port.into(),
+        });
+    }
+
+    let score_signal = resolve_score_signal_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "score",
+    )?;
+    let schedule = NoteSchedule::from_score_signal(&score_signal, sample_rate);
+    let param_name = read_string_input(node, "param", "cutoff_mult")?;
+
+    Ok(NodeValue::Signal(Box::new(NoteParamSampler {
+        schedule,
+        param_name,
+    })))
 }
 
 fn translate_chord_at_time_port(
@@ -947,6 +1062,53 @@ fn build_arpeggio_score(
     }))
 }
 
+fn build_bass_line_score(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node: &Node,
+) -> Result<Score, TranslateError> {
+    let progression = resolve_progression_signal_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "progression",
+    )?;
+    let tempo = resolve_tempo_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "tempo",
+    )?;
+    let time_signature = resolve_time_signature_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "time_signature",
+    )?;
+    let subdivision = read_number_input(node, "subdivision", 8.0)? as u8;
+    let octave_offset = read_number_input(node, "octave_offset", -24.0)? as i16;
+
+    Ok(bass_line(BassLineConfig {
+        progression: progression.progression,
+        tempo,
+        time_signature,
+        subdivision,
+        octave_offset,
+    }))
+}
+
 fn build_drum_grid_score(
     graph: &Graph,
     registry: &Registry,
@@ -995,6 +1157,13 @@ fn read_number_input(node: &Node, port: &str, default: f64) -> Result<f64, Trans
     }
 }
 
+fn read_string_input(node: &Node, port: &str, default: &str) -> Result<String, TranslateError> {
+    match node.inputs.get(port) {
+        Some(value) => primitive_to_string(&node.id, port, value),
+        None => Ok(default.to_string()),
+    }
+}
+
 fn wired_source(
     edges_by_target: &BTreeMap<TargetKey, PortReference>,
     node_id: &str,
@@ -1017,6 +1186,20 @@ fn primitive_to_f64(
     match value {
         PrimitiveValue::Number(n) => Ok(*n),
         _ => Err(TranslateError::ExpectedNumber {
+            node: node_id.into(),
+            port: port_id.into(),
+        }),
+    }
+}
+
+fn primitive_to_string(
+    node_id: &str,
+    port_id: &str,
+    value: &PrimitiveValue,
+) -> Result<String, TranslateError> {
+    match value {
+        PrimitiveValue::String(s) => Ok(s.clone()),
+        _ => Err(TranslateError::ExpectedString {
             node: node_id.into(),
             port: port_id.into(),
         }),
@@ -1069,6 +1252,17 @@ struct MultiplySampler {
 }
 
 impl Sampler for MultiplySampler {
+    fn at(&self, t: f64) -> f32 {
+        multiply(self.a.at(t), self.b.at(t))
+    }
+}
+
+struct MultiplyControlSampler {
+    a: Box<dyn Sampler>,
+    b: Box<dyn Sampler>,
+}
+
+impl Sampler for MultiplyControlSampler {
     fn at(&self, t: f64) -> f32 {
         multiply(self.a.at(t), self.b.at(t))
     }
@@ -1197,8 +1391,8 @@ struct NoteStartSampler {
 impl Sampler for NoteStartSampler {
     fn at(&self, t: f64) -> f32 {
         self.schedule
-            .active_at(t)
-            .map(|note| note.start_secs as f32)
+            .note_global_start_secs(t)
+            .map(|start| start as f32)
             .unwrap_or(0.0)
     }
 }
@@ -1211,8 +1405,50 @@ impl Sampler for NoteDurationSampler {
     fn at(&self, t: f64) -> f32 {
         self.schedule
             .active_at(t)
-            .map(|note| note.duration_secs as f32)
+            .map(|note| self.schedule.note_duration_secs(note) as f32)
             .unwrap_or(0.0)
+    }
+}
+
+struct NoteVelocitySampler {
+    schedule: NoteSchedule,
+}
+
+impl Sampler for NoteVelocitySampler {
+    fn at(&self, t: f64) -> f32 {
+        self.schedule
+            .active_at(t)
+            .map(|note| note.velocity)
+            .unwrap_or(0.0)
+    }
+}
+
+struct NoteParamSampler {
+    schedule: NoteSchedule,
+    param_name: String,
+}
+
+impl Sampler for NoteParamSampler {
+    fn at(&self, t: f64) -> f32 {
+        match self.schedule.active_at(t) {
+            None => 0.0,
+            Some(note) => note.param_or(&self.param_name, 1.0) as f32,
+        }
+    }
+}
+
+struct BandlimitedSawSampler {
+    frequency: Box<dyn Sampler>,
+    elapsed: Box<dyn Sampler>,
+    cutoff: Box<dyn Sampler>,
+}
+
+impl Sampler for BandlimitedSawSampler {
+    fn at(&self, t: f64) -> f32 {
+        let frequency = self.frequency.at(t);
+        let elapsed = self.elapsed.at(t) as f64;
+        let cutoff = self.cutoff.at(t);
+        bandlimited_saw(frequency, elapsed, cutoff)
     }
 }
 
@@ -1223,11 +1459,15 @@ struct NoteEnvelopeSampler {
 
 impl Sampler for NoteEnvelopeSampler {
     fn at(&self, t: f64) -> f32 {
-        match self.schedule.active_at(t) {
+        match self.schedule.note_local_secs(t) {
             None => 0.0,
-            Some(note) => {
-                let local = t - note.start_secs;
-                self.adsr.value_at(local, note.duration_secs)
+            Some(local) => {
+                let duration = self
+                    .schedule
+                    .active_at(t)
+                    .map(|note| self.schedule.note_duration_secs(note))
+                    .unwrap_or(0.0);
+                self.adsr.value_at(local, duration)
             }
         }
     }
@@ -1338,10 +1578,29 @@ mod tests {
 
     #[test]
     fn translate_arpeggio_graph_with_loop_nodes() {
-        let json = include_str!("../../../../demos/arpeggio.json");
+        let json = include_str!("../../../../demos/demo-01.json");
         let graph = aura_imp::graph_from_json_str(json).expect("graph");
         let registry = aura_registry().expect("registry");
         translate_graph(&graph, &registry, SampleRate::RATE_44100).expect("translate");
+    }
+
+    #[test]
+    fn looped_note_envelope_is_active_in_second_cycle() {
+        use aura_composer::{arpeggio, ArpeggioConfig};
+
+        let score = arpeggio(ArpeggioConfig::default());
+        let signal = ScoreSignal::finite(score).with_looping(true);
+        let cycle = signal.score.loop_cycle_secs();
+        let schedule = NoteSchedule::from_score_signal(&signal, SampleRate::RATE_44100);
+        let sampler = NoteEnvelopeSampler {
+            schedule,
+            adsr: LinearAdsr::default(),
+        };
+        let early_second_cycle = sampler.at(cycle + 0.01) as f64;
+        assert!(
+            early_second_cycle > 0.0,
+            "expected audible envelope after loop cycle, got {early_second_cycle}"
+        );
     }
 
     #[test]

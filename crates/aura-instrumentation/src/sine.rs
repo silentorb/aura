@@ -1,4 +1,7 @@
 //! Sine oscillator instrument with per-note ADSR.
+//!
+//! `ScheduledEvent::event.params` carries per-note custom data for future instrument
+//! variants; this instrument reads semitone and velocity only.
 
 use crate::adsr::LinearAdsr;
 use crate::sampler::Instrument;

@@ -25,15 +25,16 @@ cargo clippy
 ./demos/render-all.sh
 ```
 
-This renders `demos/sine.json` and `demos/arpeggio.json` to `output/sine.wav` and `output/arpeggio.wav` (32-bit float, mono, 44100 Hz). The `output/` directory is gitignored.
+This renders `demos/demo-01.json` to `output/demo-01.wav` (32-bit float, mono, 44100 Hz). The `output/` directory is gitignored.
 
 ### CLI
 
 ```bash
 cargo run -p aura-cli -- \
-  --graph demos/sine.json \
-  --output output/sine.wav \
-  --duration 10s \
+  --graph demos/demo-01.json \
+  --output output/demo-01.wav \
+  --duration 2m \
+  --tempo 120 \
   --sample-rate 44100
 ```
 
