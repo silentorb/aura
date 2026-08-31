@@ -1,51 +1,84 @@
 //! Procedural composition generators for Aura.
 
 use aura_composition::{
-    NaturalMinor, NoteEvent, Pitch, Score, Tempo, TimeSignature,
+    ChordProgression, ChordRegion, NaturalMinor, NoteEvent, Score, Semitone, Tempo, TimeSignature,
 };
 
-/// Configuration for a minor-key arpeggio generator.
+/// Configuration for a progression-driven arpeggio generator.
 #[derive(Debug, Clone, PartialEq)]
-pub struct MinorArpeggioConfig {
-    pub root: Pitch,
+pub struct ArpeggioConfig {
+    pub progression: ChordProgression,
     pub bars: u32,
-    pub tempo: Tempo,
-    pub time_signature: TimeSignature,
     /// Subdivision of a whole note (8 = eighth notes).
     pub subdivision: u8,
 }
 
-impl Default for MinorArpeggioConfig {
+impl Default for ArpeggioConfig {
     fn default() -> Self {
         Self {
-            root: Pitch(57), // A3
-            bars: 2,
-            tempo: Tempo::default(),
-            time_signature: TimeSignature::FOUR_FOUR,
-            subdivision: 8,
+            progression: epic_minor_progression(Semitone::A3, 1),
+            bars: 4,
+            subdivision: 4,
         }
     }
 }
 
-/// Generates a 4/4 natural-minor i-chord arpeggio (root, minor third, fifth).
-pub fn minor_arpeggio(config: MinorArpeggioConfig) -> Score {
+/// Epic i → VI → III → VII minor-key progression, one chord per bar in 4/4.
+pub fn epic_minor_progression(key_root: Semitone, bars_per_chord: u32) -> ChordProgression {
+    let beats_per_chord =
+        bars_per_chord as f64 * TimeSignature::FOUR_FOUR.quarter_beats_per_bar();
+    let chords = [
+        NaturalMinor::triad_i(key_root),
+        NaturalMinor::triad_vi(key_root),
+        NaturalMinor::triad_iii(key_root),
+        NaturalMinor::triad_vii(key_root),
+    ];
+
+    let regions = chords
+        .iter()
+        .enumerate()
+        .map(|(i, chord)| ChordRegion {
+            start_beats: i as f64 * beats_per_chord,
+            duration_beats: beats_per_chord,
+            chord: chord.clone(),
+        })
+        .collect();
+
+    ChordProgression {
+        tempo: Tempo::default(),
+        time_signature: TimeSignature::FOUR_FOUR,
+        regions,
+    }
+}
+
+/// Generates an arpeggio driven by a chord progression (chord at each note start).
+///
+/// The arpeggio degree resets at each bar boundary so the pattern aligns with the
+/// progression meter (e.g. four quarter-note picks per bar in 4/4: root–third–fifth–root).
+pub fn arpeggio(config: ArpeggioConfig) -> Score {
     let note_duration_beats = 4.0 / f64::from(config.subdivision);
-    let beats_per_bar = f64::from(config.time_signature.beats_per_bar);
+    let beats_per_bar = config.progression.time_signature.quarter_beats_per_bar();
     let total_beats = beats_per_bar * f64::from(config.bars);
 
     let mut events = Vec::new();
     let mut beat = 0.0;
-    let mut degree = 0usize;
 
     while beat < total_beats - 1e-9 {
-        let semitone_offset = NaturalMinor::TRIAD_I[degree % 3];
-        let pitch = config.root.transpose(semitone_offset);
-        events.push(NoteEvent::new(pitch, beat, note_duration_beats));
+        let beat_in_bar = beat % beats_per_bar;
+        let degree = (beat_in_bar / note_duration_beats).round() as usize;
+
+        let chord = config.progression.chord_at_beats(beat);
+        let semitones = chord.semitones();
+        let semitone = semitones[degree % semitones.len()];
+        events.push(NoteEvent::new(semitone, beat, note_duration_beats));
         beat += note_duration_beats;
-        degree += 1;
     }
 
-    Score::new(config.time_signature, config.tempo, events)
+    Score::new(
+        config.progression.time_signature,
+        config.progression.tempo,
+        events,
+    )
 }
 
 #[cfg(test)]
@@ -54,46 +87,77 @@ mod tests {
     use aura_composition::sort_events_by_start;
 
     #[test]
-    fn minor_arpeggio_emits_expected_event_count() {
-        let score = minor_arpeggio(MinorArpeggioConfig::default());
-        // 2 bars × 4 beats × 2 eighth-notes per beat = 16 events
+    fn arpeggio_emits_expected_event_count() {
+        let score = arpeggio(ArpeggioConfig::default());
+        // 4 bars × 4 quarter-note picks per bar = 16 events
         assert_eq!(score.events.len(), 16);
     }
 
     #[test]
-    fn minor_arpeggio_start_times_are_monotonic() {
-        let score = minor_arpeggio(MinorArpeggioConfig::default());
+    fn arpeggio_start_times_are_monotonic() {
+        let score = arpeggio(ArpeggioConfig::default());
         for window in score.events.windows(2) {
             assert!(window[1].start_beats >= window[0].start_beats);
         }
     }
 
     #[test]
-    fn minor_arpeggio_pitches_cycle_i_chord() {
-        let config = MinorArpeggioConfig::default();
-        let root = config.root;
-        let score = minor_arpeggio(config);
-        let expected: Vec<i16> = (0..score.events.len())
-            .map(|i| {
-                let offset = NaturalMinor::TRIAD_I[i % 3];
-                root.transpose(offset).0
-            })
+    fn arpeggio_semitones_change_per_chord_region() {
+        let score = arpeggio(ArpeggioConfig::default());
+        // First bar (i chord): root–third–fifth–root on quarter beats
+        let i_tones: Vec<i16> = score
+            .events
+            .iter()
+            .filter(|e| e.start_beats < 4.0 - 1e-9)
+            .map(|e| e.semitone.0)
             .collect();
-        let actual: Vec<i16> = score.events.iter().map(|e| e.pitch.0).collect();
-        assert_eq!(actual, expected);
+        assert_eq!(i_tones, vec![57, 60, 64, 57]);
+
+        // Second bar (VI chord): F–A–C–F
+        let vi_tones: Vec<i16> = score
+            .events
+            .iter()
+            .filter(|e| e.start_beats >= 4.0 - 1e-9 && e.start_beats < 8.0 - 1e-9)
+            .map(|e| e.semitone.0)
+            .collect();
+        assert_eq!(vi_tones, vec![65, 69, 72, 65]);
     }
 
     #[test]
-    fn minor_arpeggio_duration_is_two_bars() {
-        let score = minor_arpeggio(MinorArpeggioConfig::default());
-        assert!((score.duration_beats() - 8.0).abs() < 1e-9);
+    fn arpeggio_starts_each_bar_on_chord_root() {
+        let score = arpeggio(ArpeggioConfig::default());
+        let progression = epic_minor_progression(Semitone::A3, 1);
+        let beats_per_bar = 4.0;
+        for bar in 0..4 {
+            let bar_start = bar as f64 * beats_per_bar;
+            let first = score
+                .events
+                .iter()
+                .find(|e| (e.start_beats - bar_start).abs() < 1e-9)
+                .expect("note on bar downbeat");
+            let chord = progression.chord_at_beats(bar_start);
+            assert_eq!(first.semitone.0, chord.root.0);
+        }
+    }
+
+    #[test]
+    fn arpeggio_duration_is_four_bars() {
+        let score = arpeggio(ArpeggioConfig::default());
+        assert!((score.duration_beats() - 16.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn epic_progression_has_four_regions() {
+        let progression = epic_minor_progression(Semitone::A3, 1);
+        assert_eq!(progression.regions.len(), 4);
+        assert!((progression.regions[0].duration_beats - 4.0).abs() < 1e-9);
     }
 
     #[test]
     fn events_can_be_sorted_without_reordering_equal_starts() {
-        let mut score = minor_arpeggio(MinorArpeggioConfig::default());
+        let mut score = arpeggio(ArpeggioConfig::default());
         score.events.reverse();
         sort_events_by_start(&mut score.events);
-        minor_arpeggio_start_times_are_monotonic();
+        arpeggio_start_times_are_monotonic();
     }
 }

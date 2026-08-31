@@ -109,15 +109,15 @@ pub enum ScheduleError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aura_composition::{NoteEvent, Pitch, Tempo, TimeSignature};
+    use aura_composition::{NoteEvent, Semitone, Tempo, TimeSignature};
 
     fn sample_score() -> Score {
         Score::new(
             TimeSignature::FOUR_FOUR,
             Tempo::new(120.0).expect("tempo"),
             vec![
-                NoteEvent::new(Pitch(60), 0.0, 0.5),
-                NoteEvent::new(Pitch(64), 0.5, 0.5),
+                NoteEvent::new(Semitone(60), 0.0, 0.5),
+                NoteEvent::new(Semitone(64), 0.5, 0.5),
             ],
         )
     }
@@ -139,8 +139,8 @@ mod tests {
             TimeSignature::FOUR_FOUR,
             Tempo::default(),
             vec![
-                NoteEvent::new(Pitch(64), 1.0, 0.5),
-                NoteEvent::new(Pitch(60), 0.0, 0.5),
+                NoteEvent::new(Semitone(64), 1.0, 0.5),
+                NoteEvent::new(Semitone(60), 0.0, 0.5),
             ],
         );
         let schedule = schedule_offline(&score, SampleRate::RATE_44100).expect("schedule");

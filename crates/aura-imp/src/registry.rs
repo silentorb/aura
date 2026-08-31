@@ -66,6 +66,7 @@ mod tests {
         let registry = aura_registry().expect("registry");
         assert!(get_node_type(&registry, "time").is_some());
         assert!(get_node_type(&registry, "sine").is_some());
-        assert!(get_node_type(&registry, "minor_arpeggio").is_some());
+        assert!(get_node_type(&registry, "arpeggio").is_some());
+        assert!(get_node_type(&registry, "epic_minor_progression").is_some());
     }
 }

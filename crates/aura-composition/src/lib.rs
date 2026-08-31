@@ -24,6 +24,11 @@ impl TimeSignature {
         beats_per_bar: 4,
         beat_unit: 4,
     };
+
+    /// Quarter-note beats per bar (4/4 → 4.0, 6/8 → 3.0).
+    pub fn quarter_beats_per_bar(&self) -> f64 {
+        f64::from(self.beats_per_bar) * 4.0 / f64::from(self.beat_unit)
+    }
 }
 
 /// Tempo in beats per minute.
@@ -52,35 +57,154 @@ impl Tempo {
     }
 }
 
-/// Pitch as a MIDI-style semitone number (0 = C0, 69 = A4).
+/// Discrete semitone on the 12-TET chromatic scale. Not a frequency.
+/// Encoded as semitones above C0; prefer named constants in user-facing code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Pitch(pub i16);
+pub struct Semitone(pub i16);
 
-impl Pitch {
+impl Semitone {
     pub const A4: Self = Self(69);
-
-    pub fn from_semitone(semitone: i16) -> Self {
-        Self(semitone)
-    }
+    pub const A3: Self = Self(57);
 
     /// Convert to frequency in Hz using A4 = 440 Hz equal temperament.
     pub fn to_hz(self) -> f64 {
         440.0 * 2.0_f64.powf(f64::from(self.0 - 69) / 12.0)
     }
 
-    /// Semitone offset from this pitch.
-    pub fn transpose(self, semitones: i16) -> Self {
-        Self(self.0 + semitones)
+    /// Semitone offset from this key pitch.
+    pub fn transpose(self, offset: i16) -> Self {
+        Self(self.0 + offset)
     }
 }
 
-/// Natural minor scale degrees relative to root (semitone offsets).
+/// Absolute semitones or interval offsets from root (for extensions, sus, omissions).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChordTone {
+    Interval(i16),
+    Semitone(Semitone),
+}
+
+/// A chord: root, voiced tones, and optional bass for slash chords.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Chord {
+    pub root: Semitone,
+    pub tones: Vec<ChordTone>,
+    pub bass: Option<Semitone>,
+}
+
+impl Chord {
+    pub fn from_triad(root: Semitone, third: i16, fifth: i16) -> Self {
+        Self::from_intervals(root, &[0, third, fifth])
+    }
+
+    pub fn from_intervals(root: Semitone, intervals: &[i16]) -> Self {
+        Self {
+            root,
+            tones: intervals
+                .iter()
+                .copied()
+                .map(ChordTone::Interval)
+                .collect(),
+            bass: None,
+        }
+    }
+
+    /// Resolved absolute semitones for arpeggiation and voicing.
+    pub fn semitones(&self) -> Vec<Semitone> {
+        self.tones
+            .iter()
+            .map(|tone| match tone {
+                ChordTone::Interval(offset) => self.root.transpose(*offset),
+                ChordTone::Semitone(s) => *s,
+            })
+            .collect()
+    }
+}
+
+/// A chord held for a span of beat time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChordRegion {
+    pub start_beats: f64,
+    pub duration_beats: f64,
+    pub chord: Chord,
+}
+
+/// Timed sequence of chords with tempo and meter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChordProgression {
+    pub tempo: Tempo,
+    pub time_signature: TimeSignature,
+    pub regions: Vec<ChordRegion>,
+}
+
+impl ChordProgression {
+    /// Active chord at the given beat position (quarter-note beat grid).
+    pub fn chord_at_beats(&self, beat: f64) -> &Chord {
+        self.regions
+            .iter()
+            .find(|region| {
+                beat >= region.start_beats - 1e-9
+                    && beat < region.start_beats + region.duration_beats - 1e-9
+            })
+            .map(|region| &region.chord)
+            .unwrap_or_else(|| {
+                self.regions
+                    .last()
+                    .map(|region| &region.chord)
+                    .expect("progression must have at least one region")
+            })
+    }
+
+    /// Active chord at the given time in seconds.
+    pub fn chord_at_secs(&self, time_secs: f64) -> &Chord {
+        let beat = time_secs / self.tempo.seconds_per_beat();
+        self.chord_at_beats(beat)
+    }
+}
+
+/// Per-frame chord lookup for data signals.
+pub trait ChordSignal: Send + Sync {
+    fn chord_at(&self, time_secs: f64) -> Chord;
+}
+
+impl ChordSignal for ChordProgression {
+    fn chord_at(&self, time_secs: f64) -> Chord {
+        self.chord_at_secs(time_secs).clone()
+    }
+}
+
+/// Natural minor scale degrees relative to key root (semitone offsets).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NaturalMinor;
 
 impl NaturalMinor {
-    /// i, ii°, III, iv, v, VI, VII as semitone offsets from root.
+    /// i triad intervals from key root.
     pub const TRIAD_I: [i16; 3] = [0, 3, 7];
+    /// VI (major) triad intervals from key root.
+    pub const TRIAD_VI: [i16; 3] = [8, 12, 15];
+    /// III (major) triad intervals from key root.
+    pub const TRIAD_III: [i16; 3] = [3, 7, 10];
+    /// VII (major) triad intervals from key root.
+    pub const TRIAD_VII: [i16; 3] = [10, 14, 17];
+
+    pub fn triad_i(key_root: Semitone) -> Chord {
+        Chord::from_intervals(key_root, &Self::TRIAD_I)
+    }
+
+    pub fn triad_vi(key_root: Semitone) -> Chord {
+        let root = key_root.transpose(8);
+        Chord::from_triad(root, 4, 7)
+    }
+
+    pub fn triad_iii(key_root: Semitone) -> Chord {
+        let root = key_root.transpose(3);
+        Chord::from_triad(root, 4, 7)
+    }
+
+    pub fn triad_vii(key_root: Semitone) -> Chord {
+        let root = key_root.transpose(10);
+        Chord::from_triad(root, 4, 7)
+    }
 }
 
 /// Per-note custom parameters (extensible stub for v1).
@@ -89,7 +213,7 @@ pub type NoteParams = HashMap<String, f64>;
 /// A single note event in beat time.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NoteEvent {
-    pub pitch: Pitch,
+    pub semitone: Semitone,
     pub start_beats: f64,
     pub duration_beats: f64,
     pub velocity: f32,
@@ -97,9 +221,9 @@ pub struct NoteEvent {
 }
 
 impl NoteEvent {
-    pub fn new(pitch: Pitch, start_beats: f64, duration_beats: f64) -> Self {
+    pub fn new(semitone: Semitone, start_beats: f64, duration_beats: f64) -> Self {
         Self {
-            pitch,
+            semitone,
             start_beats,
             duration_beats,
             velocity: 1.0,
@@ -170,8 +294,42 @@ mod tests {
     }
 
     #[test]
-    fn pitch_a4_is_440_hz() {
-        assert!((Pitch::A4.to_hz() - 440.0).abs() < 1e-6);
+    fn semitone_a4_is_440_hz() {
+        assert!((Semitone::A4.to_hz() - 440.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn quarter_beats_per_bar_four_four() {
+        assert!((TimeSignature::FOUR_FOUR.quarter_beats_per_bar() - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn chord_semitones_from_intervals() {
+        let chord = Chord::from_intervals(Semitone::A3, &[0, 3, 7]);
+        let semitones: Vec<i16> = chord.semitones().iter().map(|s| s.0).collect();
+        assert_eq!(semitones, vec![57, 60, 64]);
+    }
+
+    #[test]
+    fn progression_chord_at_beats() {
+        let progression = ChordProgression {
+            tempo: Tempo::default(),
+            time_signature: TimeSignature::FOUR_FOUR,
+            regions: vec![
+                ChordRegion {
+                    start_beats: 0.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_i(Semitone::A3),
+                },
+                ChordRegion {
+                    start_beats: 4.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_vi(Semitone::A3),
+                },
+            ],
+        };
+        assert_eq!(progression.chord_at_beats(0.0).root.0, 57);
+        assert_eq!(progression.chord_at_beats(4.0).root.0, 65);
     }
 
     #[test]
@@ -180,8 +338,8 @@ mod tests {
             TimeSignature::FOUR_FOUR,
             Tempo::default(),
             vec![
-                NoteEvent::new(Pitch(60), 0.0, 1.0),
-                NoteEvent::new(Pitch(64), 1.0, 2.0),
+                NoteEvent::new(Semitone(60), 0.0, 1.0),
+                NoteEvent::new(Semitone(64), 1.0, 2.0),
             ],
         );
         assert!((score.duration_beats() - 3.0).abs() < 1e-9);
@@ -191,8 +349,8 @@ mod tests {
     #[test]
     fn sort_events_by_start_orders_events() {
         let mut events = vec![
-            NoteEvent::new(Pitch(64), 2.0, 1.0),
-            NoteEvent::new(Pitch(60), 0.0, 1.0),
+            NoteEvent::new(Semitone(64), 2.0, 1.0),
+            NoteEvent::new(Semitone(60), 0.0, 1.0),
         ];
         sort_events_by_start(&mut events);
         assert!((events[0].start_beats - 0.0).abs() < 1e-9);

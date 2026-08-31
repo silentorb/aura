@@ -20,7 +20,7 @@ impl Instrument for SineInstrument {
         sample_rate: SampleRate,
     ) -> Vec<f32> {
         let rate = sample_rate.get() as f64;
-        let frequency = scheduled.event.pitch.to_hz() as f32;
+        let frequency = scheduled.event.semitone.to_hz() as f32;
         let frames = scheduled.duration_frames;
         let note_duration_secs = frames as f64 / rate;
         let velocity = scheduled.event.velocity;

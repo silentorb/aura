@@ -14,7 +14,7 @@ cargo run -p aura-cli --quiet -- \
 cargo run -p aura-cli --quiet -- \
   --graph demos/arpeggio.json \
   --output output/arpeggio.wav \
-  --duration 2m \
+  --duration 4m \
   --tempo 120 \
   --sample-rate 44100
 

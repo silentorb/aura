@@ -3,8 +3,8 @@
 mod note_schedule;
 
 use note_schedule::NoteSchedule;
-use aura_composer::{minor_arpeggio, MinorArpeggioConfig};
-use aura_composition::{Pitch, Score, Tempo, TimeSignature};
+use aura_composer::{arpeggio, epic_minor_progression, ArpeggioConfig};
+use aura_composition::{ChordProgression, ChordSignal, Score, Semitone, Tempo};
 use aura_dsp::{multiply, sine};
 use aura_imp::{Graph, Node, NodeId, PortReference, PrimitiveValue, Registry};
 use aura_instrumentation::LinearAdsr;
@@ -31,13 +31,16 @@ pub enum TranslateError {
     ExpectedNumber { node: NodeId, port: String },
     #[error("node `{node}` output `{port}` is not available")]
     MissingOutputPort { node: NodeId, port: String },
-    #[error("score input on node `{node}` must connect to minor_arpeggio")]
+    #[error("score input on node `{node}` must connect to a score-producing node")]
     InvalidScoreSource { node: NodeId },
+    #[error("progression input on node `{node}` must connect to a chord progression node")]
+    InvalidProgressionSource { node: NodeId },
 }
 
 enum NodeValue {
     Signal(Box<dyn Sampler>),
     Score(Score),
+    ChordProgression(ChordProgression),
 }
 
 /// Translates an Imp graph into a pure Time → Sample function.
@@ -60,10 +63,12 @@ pub fn translate_graph(
         "value",
     )? {
         NodeValue::Signal(sampler) => Ok(sampler),
-        NodeValue::Score(_) => Err(TranslateError::MissingOutputPort {
-            node: output_node,
-            port: "value".into(),
-        }),
+        NodeValue::Score(_) | NodeValue::ChordProgression(_) => {
+            Err(TranslateError::MissingOutputPort {
+                node: output_node,
+                port: "value".into(),
+            })
+        }
     }
 }
 
@@ -199,20 +204,39 @@ fn translate_node(
             )?;
             Ok(NodeValue::Signal(Box::new(MultiplySampler { a, b })))
         }
-        "pitch_to_hz" => {
-            let pitch = signal_input(
+        "semitone_to_hz" => {
+            let semitone = signal_input(
                 graph,
                 registry,
                 sample_rate,
                 edges_by_target,
                 visiting,
                 node_id,
-                "pitch",
+                "semitone",
             )?;
-            Ok(NodeValue::Signal(Box::new(PitchToHzSampler { pitch })))
+            Ok(NodeValue::Signal(Box::new(SemitoneToHzSampler { semitone })))
         }
-        "minor_arpeggio" => Ok(NodeValue::Score(build_minor_arpeggio_score(node)?)),
+        "epic_minor_progression" => Ok(NodeValue::ChordProgression(
+            build_epic_minor_progression(node)?,
+        )),
+        "arpeggio" => Ok(NodeValue::Score(build_arpeggio_score(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node,
+        )?)),
         "note_at_time" => translate_note_at_time_port(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node_id,
+            output_port,
+        ),
+        "chord_at_time" => translate_chord_at_time_port(
             graph,
             registry,
             sample_rate,
@@ -271,10 +295,52 @@ fn translate_note_at_time_port(
     let schedule = NoteSchedule::from_score(&score, sample_rate);
 
     let sampler: Box<dyn Sampler> = match output_port {
-        "pitch" => Box::new(NotePitchSampler { schedule }),
+        "semitone" => Box::new(NoteSemitoneSampler { schedule }),
         "active" => Box::new(NoteActiveSampler { schedule }),
         "note_start" => Box::new(NoteStartSampler { schedule }),
         "note_duration" => Box::new(NoteDurationSampler { schedule }),
+        _ => {
+            return Err(TranslateError::MissingOutputPort {
+                node: node_id.into(),
+                port: output_port.into(),
+            })
+        }
+    };
+
+    Ok(NodeValue::Signal(sampler))
+}
+
+fn translate_chord_at_time_port(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    output_port: &str,
+) -> Result<NodeValue, TranslateError> {
+    let progression = resolve_progression_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "progression",
+    )?;
+    let _time = signal_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "time",
+    )?;
+
+    let sampler: Box<dyn Sampler> = match output_port {
+        "root" => Box::new(ChordRootSampler { progression }),
+        "active" => Box::new(ChordActiveSampler { progression }),
         _ => {
             return Err(TranslateError::MissingOutputPort {
                 node: node_id.into(),
@@ -312,6 +378,32 @@ fn resolve_score_input(
     }
 }
 
+fn resolve_progression_input(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    port: &str,
+) -> Result<ChordProgression, TranslateError> {
+    let source = wired_source(edges_by_target, node_id, port)?;
+    match translate_node(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &source.node,
+        &source.port,
+    )? {
+        NodeValue::ChordProgression(progression) => Ok(progression),
+        _ => Err(TranslateError::InvalidProgressionSource {
+            node: source.node,
+        }),
+    }
+}
+
 fn signal_input(
     graph: &Graph,
     registry: &Registry,
@@ -340,25 +432,50 @@ fn signal_input(
         NodeValue::Score(_) => Err(TranslateError::InvalidScoreSource {
             node: source.node,
         }),
+        NodeValue::ChordProgression(_) => Err(TranslateError::InvalidProgressionSource {
+            node: source.node,
+        }),
     }
 }
 
-fn build_minor_arpeggio_score(node: &Node) -> Result<Score, TranslateError> {
-    let root = read_number_input(node, "root", 57.0)? as i16;
-    let bars = read_number_input(node, "bars", 2.0)? as u32;
+fn build_epic_minor_progression(node: &Node) -> Result<ChordProgression, TranslateError> {
+    let root = read_number_input(node, "root", Semitone::A3.0 as f64)? as i16;
+    let bars_per_chord = read_number_input(node, "bars_per_chord", 1.0)? as u32;
     let tempo = Tempo::new(read_number_input(node, "tempo", 120.0)?).map_err(|_| {
         TranslateError::ExpectedNumber {
             node: node.id.clone(),
             port: "tempo".into(),
         }
     })?;
-    let subdivision = read_number_input(node, "subdivision", 8.0)? as u8;
 
-    Ok(minor_arpeggio(MinorArpeggioConfig {
-        root: Pitch(root),
+    let mut progression = epic_minor_progression(Semitone(root), bars_per_chord);
+    progression.tempo = tempo;
+    Ok(progression)
+}
+
+fn build_arpeggio_score(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node: &Node,
+) -> Result<Score, TranslateError> {
+    let progression = resolve_progression_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "progression",
+    )?;
+    let bars = read_number_input(node, "bars", 4.0)? as u32;
+    let subdivision = read_number_input(node, "subdivision", 4.0)? as u8;
+
+    Ok(arpeggio(ArpeggioConfig {
+        progression,
         bars,
-        tempo,
-        time_signature: TimeSignature::FOUR_FOUR,
         subdivision,
     }))
 }
@@ -449,26 +566,26 @@ impl Sampler for MultiplySampler {
     }
 }
 
-struct PitchToHzSampler {
-    pitch: Box<dyn Sampler>,
+struct SemitoneToHzSampler {
+    semitone: Box<dyn Sampler>,
 }
 
-impl Sampler for PitchToHzSampler {
+impl Sampler for SemitoneToHzSampler {
     fn at(&self, t: f64) -> f32 {
-        let semitone = self.pitch.at(t).round() as i16;
-        Pitch(semitone).to_hz() as f32
+        let value = self.semitone.at(t).round() as i16;
+        Semitone(value).to_hz() as f32
     }
 }
 
-struct NotePitchSampler {
+struct NoteSemitoneSampler {
     schedule: NoteSchedule,
 }
 
-impl Sampler for NotePitchSampler {
+impl Sampler for NoteSemitoneSampler {
     fn at(&self, t: f64) -> f32 {
         self.schedule
             .active_at(t)
-            .map(|note| note.pitch.0 as f32)
+            .map(|note| note.semitone.0 as f32)
             .unwrap_or(0.0)
     }
 }
@@ -530,9 +647,56 @@ impl Sampler for NoteEnvelopeSampler {
     }
 }
 
+struct ChordRootSampler {
+    progression: ChordProgression,
+}
+
+impl Sampler for ChordRootSampler {
+    fn at(&self, t: f64) -> f32 {
+        self.progression.chord_at(t).root.0 as f32
+    }
+}
+
+struct ChordActiveSampler {
+    progression: ChordProgression,
+}
+
+impl Sampler for ChordActiveSampler {
+    fn at(&self, t: f64) -> f32 {
+        let beat = t / self.progression.tempo.seconds_per_beat();
+        if self
+            .progression
+            .regions
+            .iter()
+            .any(|region| {
+                beat >= region.start_beats - 1e-9
+                    && beat < region.start_beats + region.duration_beats - 1e-9
+            })
+        {
+            1.0
+        } else {
+            0.0
+        }
+    }
+}
+
 pub fn infer_score_duration_secs(graph: &Graph, sample_rate: SampleRate) -> Option<f64> {
-    let score_node = graph.nodes.values().find(|node| node.node_type == "minor_arpeggio")?;
-    let score = build_minor_arpeggio_score(score_node).ok()?;
+    let score_node = graph
+        .nodes
+        .values()
+        .find(|node| node.node_type == "arpeggio")?;
+    let edges_by_target = index_edges_by_target(graph);
+    let mut visiting = BTreeSet::new();
+    let registry = aura_imp::aura_registry().ok()?;
+    let score = build_arpeggio_score(
+        graph,
+        &registry,
+        sample_rate,
+        &edges_by_target,
+        &mut visiting,
+        score_node,
+    )
+    .ok()?;
     let schedule = aura_scheduler::schedule_offline(&score, sample_rate).ok()?;
     Some(schedule.total_frames as f64 / sample_rate.get() as f64)
 }

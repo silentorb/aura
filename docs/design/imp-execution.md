@@ -38,7 +38,7 @@ Translation produces nested closures (or equivalent) built once, then invoked pe
 
 | Kind | When | Examples |
 |------|------|----------|
-| Translate-time | During `translate_graph`; captured in closures | `minor_arpeggio` → `Score`; schedule tables |
+| Translate-time | During `translate_graph`; captured in closures | `arpeggio` → `Score`; `epic_minor_progression` → `ChordProgression`; schedule tables |
 | Sample-time | Inside `at(t)` | `sine(f, t)`, envelopes, note gates |
 
 ## Duration

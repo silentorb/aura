@@ -1,12 +1,12 @@
 //! Sample-time note lookup from a score.
 
-use aura_composition::{Pitch, Score};
+use aura_composition::{Score, Semitone};
 use aura_sample::SampleRate;
 use aura_scheduler::schedule_offline;
 
 #[derive(Debug, Clone)]
 pub struct ScheduledNote {
-    pub pitch: Pitch,
+    pub semitone: Semitone,
     pub start_secs: f64,
     pub duration_secs: f64,
 }
@@ -24,7 +24,7 @@ impl NoteSchedule {
             .events
             .iter()
             .map(|event| ScheduledNote {
-                pitch: event.event.pitch,
+                semitone: event.event.semitone,
                 start_secs: event.start_frame as f64 / rate,
                 duration_secs: event.duration_frames as f64 / rate,
             })
@@ -43,11 +43,14 @@ impl NoteSchedule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aura_composer::{minor_arpeggio, MinorArpeggioConfig};
+    use aura_composer::{arpeggio, ArpeggioConfig};
 
     #[test]
     fn active_at_finds_note_window() {
-        let score = minor_arpeggio(MinorArpeggioConfig::default());
+        let score = arpeggio(ArpeggioConfig {
+            bars: 1,
+            ..Default::default()
+        });
         let schedule = NoteSchedule::from_score(&score, SampleRate::RATE_44100);
         assert!(schedule.active_at(0.0).is_some());
         assert!(schedule.active_at(10.0).is_none());

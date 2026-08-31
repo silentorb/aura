@@ -1,6 +1,6 @@
 //! Musical composition node library.
 
-use crate::signals::{signal, CONTROL, SCORE, TIME};
+use crate::signals::{signal, CHORD_PROGRESSION, CONTROL, SCORE, TIME};
 use imp_core_types::{NodeLibrary, NodeType, Port, PrimitiveValue};
 use std::collections::BTreeMap;
 
@@ -17,31 +17,56 @@ pub fn music_node_library() -> NodeLibrary {
     let control = signal(CONTROL);
     let score = signal(SCORE);
     let time = signal(TIME);
+    let progression = signal(CHORD_PROGRESSION);
 
     let mut types = BTreeMap::new();
     types.insert(
-        "minor_arpeggio".into(),
+        "epic_minor_progression".into(),
         NodeType {
-            id: "minor_arpeggio".into(),
+            id: "epic_minor_progression".into(),
             inputs: BTreeMap::from([
                 (
                     "root".into(),
                     port("root", control.clone(), Some(PrimitiveValue::Number(57.0))),
                 ),
                 (
-                    "bars".into(),
-                    port("bars", control.clone(), Some(PrimitiveValue::Number(2.0))),
+                    "bars_per_chord".into(),
+                    port(
+                        "bars_per_chord",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(1.0)),
+                    ),
                 ),
                 (
                     "tempo".into(),
                     port("tempo", control.clone(), Some(PrimitiveValue::Number(120.0))),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "progression".into(),
+                port("progression", progression.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "arpeggio".into(),
+        NodeType {
+            id: "arpeggio".into(),
+            inputs: BTreeMap::from([
+                (
+                    "progression".into(),
+                    port("progression", progression.clone(), None),
+                ),
+                (
+                    "bars".into(),
+                    port("bars", control.clone(), Some(PrimitiveValue::Number(4.0))),
                 ),
                 (
                     "subdivision".into(),
                     port(
                         "subdivision",
                         control.clone(),
-                        Some(PrimitiveValue::Number(8.0)),
+                        Some(PrimitiveValue::Number(4.0)),
                     ),
                 ),
             ]),
@@ -61,8 +86,8 @@ pub fn music_node_library() -> NodeLibrary {
             ]),
             outputs: BTreeMap::from([
                 (
-                    "pitch".into(),
-                    port("pitch", control.clone(), None),
+                    "semitone".into(),
+                    port("semitone", control.clone(), None),
                 ),
                 (
                     "active".into(),
@@ -80,12 +105,35 @@ pub fn music_node_library() -> NodeLibrary {
         },
     );
     types.insert(
-        "pitch_to_hz".into(),
+        "chord_at_time".into(),
         NodeType {
-            id: "pitch_to_hz".into(),
+            id: "chord_at_time".into(),
+            inputs: BTreeMap::from([
+                (
+                    "progression".into(),
+                    port("progression", progression.clone(), None),
+                ),
+                ("time".into(), port("time", time.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([
+                (
+                    "root".into(),
+                    port("root", control.clone(), None),
+                ),
+                (
+                    "active".into(),
+                    port("active", control.clone(), None),
+                ),
+            ]),
+        },
+    );
+    types.insert(
+        "semitone_to_hz".into(),
+        NodeType {
+            id: "semitone_to_hz".into(),
             inputs: BTreeMap::from([(
-                "pitch".into(),
-                port("pitch", control, None),
+                "semitone".into(),
+                port("semitone", control, None),
             )]),
             outputs: BTreeMap::from([(
                 "frequency".into(),

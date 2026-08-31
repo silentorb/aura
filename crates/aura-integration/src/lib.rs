@@ -109,7 +109,7 @@ pub fn parse_duration_spec(input: &str, tempo_bpm: f64) -> Result<DurationSpec, 
         let measures: f64 = stripped.parse().map_err(|_| DurationParseError::InvalidMeasures(0.0))?;
         let tempo = aura_composition::Tempo::new(tempo_bpm)
             .map_err(|_| DurationParseError::InvalidMeasures(measures))?;
-        return Ok(DurationSpec::Measures { measures, tempo });
+        return Ok(DurationSpec::measures_4_4(measures, tempo));
     }
 
     let secs: f64 = trimmed.parse().map_err(|_| DurationParseError::InvalidSeconds(0.0))?;
@@ -128,10 +128,7 @@ mod tests {
         let measures = parse_duration_spec("2m", 120.0).expect("measures");
         assert_eq!(
             measures,
-            DurationSpec::Measures {
-                measures: 2.0,
-                tempo: aura_composition::Tempo::default(),
-            }
+            DurationSpec::measures_4_4(2.0, aura_composition::Tempo::default()),
         );
     }
 
@@ -153,13 +150,10 @@ mod tests {
         let graph = aura_imp::graph_from_json_str(json).expect("graph");
         let spec = SampleSpec {
             sample_rate: SampleRate::RATE_44100,
-            duration: DurationSpec::Measures {
-                measures: 2.0,
-                tempo: aura_composition::Tempo::default(),
-            },
+            duration: DurationSpec::measures_4_4(4.0, aura_composition::Tempo::default()),
         };
         let pcm = render_graph_to_pcm(&graph, spec).expect("render");
-        assert_eq!(pcm.len(), 176_400);
+        assert_eq!(pcm.len(), 352_800);
     }
 
     #[test]

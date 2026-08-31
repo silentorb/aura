@@ -12,7 +12,11 @@ See also [`architecture.md`](architecture.md) and [`imp-execution.md`](imp-execu
 
 | Term | Meaning |
 |------|---------|
-| **Notation** | Types describing musical material: pitch, time, events, scores |
+| **Notation** | Types describing musical material: semitones, time, events, scores, chords |
+| **Semitone** | Discrete key pitch on the 12-TET chromatic scale; not a frequency |
+| **Chord** | Root, voiced tones, and optional bass — built from intervals and scale degrees |
+| **ChordProgression** | Timed sequence of chords; a **data signal** sampled per frame via `ChordSignal` |
+| **Data signal** | Structured translate-time or sample-time value (e.g. `Score`, `ChordProgression`), distinct from scalar `Sampler` outputs |
 | **Composition** | Procedural generators that produce notation |
 | **Scheduling** | Converting musical time to sample-frame timelines |
 | **Instrumentation** | Per-note instrument instances, envelopes, and mix-down |
@@ -33,7 +37,7 @@ flowchart LR
 1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
 2. **Translation** — `translate_graph` composes pure `Sampler` closures.
 3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
-4. **Notation path** — `minor_arpeggio` and related nodes build scores; schedule tables drive note gates at sample time.
+4. **Notation path** — `arpeggio`, `epic_minor_progression`, and related nodes build scores and progressions; schedule tables drive note gates at sample time.
 5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules
@@ -61,6 +65,14 @@ Every aspect of music production should be expressible as **modular, reusable pa
 ### Rule 6: Holistic song functions (target)
 
 Long term, an entire song should be describable as a **single function**, with granular aspects integrated via reducers, blurring the line between notation and audio. Initial iterations need not fully realize this paradigm.
+
+### Rule 7: Chord input default
+
+By default, instruments resolve harmony **once at note-on** (`start_beats` / `start_frame`). They may optionally sample `ChordSignal` per frame (e.g. pitch glide across chord boundaries). The arpeggio demo uses the note-on default: semitone is baked into each `NoteEvent` at translate time.
+
+## Ontology
+
+Aura models music in its own terms: semitones, scale degrees, intervals, chords, and keys. Frequency (`Hz`) is derived at synthesis boundaries via `Semitone::to_hz()`. MIDI compatibility, if ever needed, is an adapter concern — not the source of truth for notation types.
 
 ## Crate responsibility matrix
 

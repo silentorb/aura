@@ -5,9 +5,14 @@
       "type": "time",
       "inputs": {}
     },
+    "prog": {
+      "id": "prog",
+      "type": "epic_minor_progression",
+      "inputs": {}
+    },
     "arp": {
       "id": "arp",
-      "type": "minor_arpeggio",
+      "type": "arpeggio",
       "inputs": {}
     },
     "note": {
@@ -15,9 +20,9 @@
       "type": "note_at_time",
       "inputs": {}
     },
-    "pitch": {
-      "id": "pitch",
-      "type": "pitch_to_hz",
+    "semitone_hz": {
+      "id": "semitone_hz",
+      "type": "semitone_to_hz",
       "inputs": {}
     },
     "start": {
@@ -52,6 +57,10 @@
     }
   },
   "edges": {
+    "prog_to_arp": {
+      "from": { "node": "prog", "port": "progression" },
+      "to": { "node": "arp", "port": "progression" }
+    },
     "arp_to_note_score": {
       "from": { "node": "arp", "port": "score" },
       "to": { "node": "note", "port": "score" }
@@ -80,12 +89,12 @@
       "from": { "node": "time", "port": "time" },
       "to": { "node": "elapsed", "port": "time" }
     },
-    "note_pitch_to_pitch": {
-      "from": { "node": "note", "port": "pitch" },
-      "to": { "node": "pitch", "port": "pitch" }
+    "note_semitone_to_hz": {
+      "from": { "node": "note", "port": "semitone" },
+      "to": { "node": "semitone_hz", "port": "semitone" }
     },
-    "pitch_to_osc": {
-      "from": { "node": "pitch", "port": "frequency" },
+    "semitone_hz_to_osc": {
+      "from": { "node": "semitone_hz", "port": "frequency" },
       "to": { "node": "osc", "port": "frequency" }
     },
     "start_to_elapsed": {

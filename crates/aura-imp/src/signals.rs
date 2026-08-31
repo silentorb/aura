@@ -14,6 +14,9 @@ pub const AUDIO_MONO: &str = "audio_mono";
 /// Musical score (translate-time only).
 pub const SCORE: &str = "score";
 
+/// Chord progression (translate-time data signal).
+pub const CHORD_PROGRESSION: &str = "chord_progression";
+
 pub fn signal(id: &str) -> SignalType {
     SignalType { id: id.into() }
 }

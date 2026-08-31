@@ -22,6 +22,18 @@ cargo clippy
 
 These apply once a Rust crate scaffold exists.
 
+## Demo artifacts
+
+The listenable outputs in [`output/`](output/) (`sine.wav`, `arpeggio.wav`) are the primary artifacts for verifying demos by ear. They are gitignored but must stay current in the workspace.
+
+After any change to demo graphs (`demos/*.json`), [`demos/render-all.sh`](demos/render-all.sh), or code that affects how those graphs render (composition, integration, imp nodes, CLI, etc.), regenerate them:
+
+```bash
+demos/render-all.sh
+```
+
+Do not rely on unit tests alone for demo audio — tests assert frame counts and determinism, not that `output/` was refreshed.
+
 ## Workspace
 
 This workspace may mount multiple repositories. Each repo may have its own `AGENTS.md` and `docs/`. Prefer the nearest `AGENTS.md` and that repo's `docs/` when working in a given tree. This file governs Aura only.

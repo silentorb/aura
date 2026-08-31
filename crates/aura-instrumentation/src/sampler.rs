@@ -65,12 +65,12 @@ pub enum SampleError {
 mod tests {
     use super::*;
     use crate::sine::SineInstrument;
-    use aura_composition::{NoteEvent, Pitch, Score, Tempo, TimeSignature};
+    use aura_composition::{NoteEvent, Score, Semitone, Tempo, TimeSignature};
     use aura_scheduler::schedule_offline;
     use aura_sample::SampleRate;
 
     fn arpeggio_score() -> Score {
-        aura_composer::minor_arpeggio(aura_composer::MinorArpeggioConfig {
+        aura_composer::arpeggio(aura_composer::ArpeggioConfig {
             bars: 1,
             ..Default::default()
         })
@@ -105,7 +105,7 @@ mod tests {
         let score = Score::new(
             TimeSignature::FOUR_FOUR,
             Tempo::default(),
-            vec![NoteEvent::new(Pitch(60), 1.0, 0.5)],
+            vec![NoteEvent::new(Semitone(60), 1.0, 0.5)],
         );
         let schedule = schedule_offline(&score, SampleRate::RATE_44100).expect("schedule");
         let buffer = sample_schedule(
