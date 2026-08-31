@@ -3,9 +3,9 @@
 mod note_schedule;
 
 use note_schedule::NoteSchedule;
-use aura_composer::{arpeggio, epic_minor_progression, ArpeggioConfig};
+use aura_composer::{arpeggio, drum_grid, epic_minor_progression, ArpeggioConfig, DrumGridConfig, DrumLane};
 use aura_composition::{ChordProgression, ChordSignal, Score, Semitone, Tempo, TimeSignature};
-use aura_dsp::{multiply, sine};
+use aura_dsp::{add, deterministic_noise, exponential_sweep_sine, highpass_noise, multiply, sine};
 use aura_imp::{Graph, Node, NodeId, PortReference, PrimitiveValue, Registry};
 use aura_instrumentation::LinearAdsr;
 use aura_render::Sampler;
@@ -213,6 +213,176 @@ fn translate_node(
             )?;
             Ok(NodeValue::Signal(Box::new(MultiplySampler { a, b })))
         }
+        "add" => {
+            let a = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "a",
+            )?;
+            let b = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "b",
+            )?;
+            Ok(NodeValue::Signal(Box::new(AddSampler { a, b })))
+        }
+        "exponential_sweep_sine" => {
+            let start_hz = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "start_hz",
+            )?;
+            let decay_rate = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "decay_rate",
+            )?;
+            let elapsed = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "elapsed",
+            )?;
+            Ok(NodeValue::Signal(Box::new(ExponentialSweepSineSampler {
+                start_hz,
+                decay_rate,
+                elapsed,
+            })))
+        }
+        "deterministic_noise" => {
+            let seed = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "seed",
+            )?;
+            let time = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "time",
+            )?;
+            Ok(NodeValue::Signal(Box::new(DeterministicNoiseSampler { seed, time })))
+        }
+        "highpass_noise" => {
+            let seed = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "seed",
+            )?;
+            let time = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "time",
+            )?;
+            let dt = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "dt",
+            )?;
+            Ok(NodeValue::Signal(Box::new(HighpassNoiseSampler { seed, time, dt })))
+        }
+        "linear_adsr" => {
+            let attack = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "attack",
+            )?;
+            let decay = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "decay",
+            )?;
+            let sustain = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "sustain",
+            )?;
+            let release = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "release",
+            )?;
+            let elapsed = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "elapsed",
+            )?;
+            let note_duration = signal_input(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node_id,
+                "note_duration",
+            )?;
+            Ok(NodeValue::Signal(Box::new(LinearAdsrSampler {
+                attack,
+                decay,
+                sustain,
+                release,
+                elapsed,
+                note_duration,
+            })))
+        }
         "semitone_to_hz" => {
             let semitone = signal_input(
                 graph,
@@ -258,6 +428,14 @@ fn translate_node(
             output_port,
         ),
         "arpeggio" => Ok(NodeValue::Score(build_arpeggio_score(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node,
+        )?)),
+        "drum_grid" => Ok(NodeValue::Score(build_drum_grid_score(
             graph,
             registry,
             sample_rate,
@@ -720,6 +898,49 @@ fn build_arpeggio_score(
     }))
 }
 
+fn build_drum_grid_score(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node: &Node,
+) -> Result<Score, TranslateError> {
+    let tempo = resolve_tempo_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "tempo",
+    )?;
+    let time_signature = resolve_time_signature_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "time_signature",
+    )?;
+    let bars = read_number_input(node, "bars", 4.0)? as u32;
+    let lane_value = read_number_input(node, "lane", 0.0)? as i32;
+    let lane = match lane_value {
+        0 => DrumLane::Kick,
+        1 => DrumLane::Snare,
+        _ => DrumLane::Kick,
+    };
+
+    Ok(drum_grid(DrumGridConfig {
+        tempo,
+        time_signature,
+        bars,
+        lane,
+        hit_duration_beats: 0.25,
+    }))
+}
+
 fn read_number_input(node: &Node, port: &str, default: f64) -> Result<f64, TranslateError> {
     match node.inputs.get(port) {
         Some(value) => primitive_to_f64(&node.id, port, value),
@@ -803,6 +1024,84 @@ struct MultiplySampler {
 impl Sampler for MultiplySampler {
     fn at(&self, t: f64) -> f32 {
         multiply(self.a.at(t), self.b.at(t))
+    }
+}
+
+struct AddSampler {
+    a: Box<dyn Sampler>,
+    b: Box<dyn Sampler>,
+}
+
+impl Sampler for AddSampler {
+    fn at(&self, t: f64) -> f32 {
+        add(self.a.at(t), self.b.at(t))
+    }
+}
+
+struct ExponentialSweepSineSampler {
+    start_hz: Box<dyn Sampler>,
+    decay_rate: Box<dyn Sampler>,
+    elapsed: Box<dyn Sampler>,
+}
+
+impl Sampler for ExponentialSweepSineSampler {
+    fn at(&self, t: f64) -> f32 {
+        exponential_sweep_sine(
+            self.start_hz.at(t),
+            self.decay_rate.at(t),
+            self.elapsed.at(t) as f64,
+        )
+    }
+}
+
+struct DeterministicNoiseSampler {
+    seed: Box<dyn Sampler>,
+    time: Box<dyn Sampler>,
+}
+
+impl Sampler for DeterministicNoiseSampler {
+    fn at(&self, t: f64) -> f32 {
+        deterministic_noise(self.seed.at(t), self.time.at(t) as f64)
+    }
+}
+
+struct HighpassNoiseSampler {
+    seed: Box<dyn Sampler>,
+    time: Box<dyn Sampler>,
+    dt: Box<dyn Sampler>,
+}
+
+impl Sampler for HighpassNoiseSampler {
+    fn at(&self, t: f64) -> f32 {
+        highpass_noise(
+            self.seed.at(t),
+            self.time.at(t) as f64,
+            self.dt.at(t) as f64,
+        )
+    }
+}
+
+struct LinearAdsrSampler {
+    attack: Box<dyn Sampler>,
+    decay: Box<dyn Sampler>,
+    sustain: Box<dyn Sampler>,
+    release: Box<dyn Sampler>,
+    elapsed: Box<dyn Sampler>,
+    note_duration: Box<dyn Sampler>,
+}
+
+impl Sampler for LinearAdsrSampler {
+    fn at(&self, t: f64) -> f32 {
+        let adsr = LinearAdsr {
+            attack: self.attack.at(t) as f64,
+            decay: self.decay.at(t) as f64,
+            sustain: self.sustain.at(t),
+            release: self.release.at(t) as f64,
+        };
+        adsr.value_at(
+            self.elapsed.at(t) as f64,
+            self.note_duration.at(t) as f64,
+        )
     }
 }
 

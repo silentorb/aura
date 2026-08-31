@@ -80,6 +80,68 @@ pub fn arpeggio(config: ArpeggioConfig) -> Score {
     Score::new(config.time_signature, config.tempo, events)
 }
 
+/// Drum lane for alternating kick/snare on a quarter-note grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DrumLane {
+    Kick = 0,
+    Snare = 1,
+}
+
+/// Configuration for a kick/snare grid pattern.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrumGridConfig {
+    pub tempo: Tempo,
+    pub time_signature: TimeSignature,
+    pub bars: u32,
+    pub lane: DrumLane,
+    /// Duration of each hit in quarter-note beats.
+    pub hit_duration_beats: f64,
+}
+
+impl Default for DrumGridConfig {
+    fn default() -> Self {
+        Self {
+            tempo: Tempo::default(),
+            time_signature: TimeSignature::FOUR_FOUR,
+            bars: 4,
+            lane: DrumLane::Kick,
+            hit_duration_beats: 0.25,
+        }
+    }
+}
+
+/// Generates kick or snare hits on alternating quarter-note beats.
+///
+/// Kick on beats 0, 2, 4, …; snare on beats 1, 3, 5, … (kick–snare–kick–snare per bar).
+pub fn drum_grid(config: DrumGridConfig) -> Score {
+    let beats_per_bar = config.time_signature.quarter_beats_per_bar();
+    let total_beats = beats_per_bar * f64::from(config.bars);
+    let mut events = Vec::new();
+    let mut beat = 0.0;
+    let mut beat_index = 0u32;
+
+    while beat < total_beats - 1e-9 {
+        let is_kick = beat_index.is_multiple_of(2);
+        let emit = match config.lane {
+            DrumLane::Kick => is_kick,
+            DrumLane::Snare => !is_kick,
+        };
+
+        if emit {
+            events.push(NoteEvent::new(
+                Semitone(0),
+                beat,
+                config.hit_duration_beats,
+            ));
+        }
+
+        beat += 1.0;
+        beat_index += 1;
+    }
+
+    Score::new(config.time_signature, config.tempo, events)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,5 +220,53 @@ mod tests {
         score.events.reverse();
         sort_events_by_start(&mut score.events);
         arpeggio_start_times_are_monotonic();
+    }
+
+    #[test]
+    fn drum_grid_kick_emits_on_even_beats() {
+        let score = drum_grid(DrumGridConfig {
+            bars: 2,
+            lane: DrumLane::Kick,
+            ..Default::default()
+        });
+        assert_eq!(score.events.len(), 4);
+        let starts: Vec<f64> = score.events.iter().map(|e| e.start_beats).collect();
+        assert_eq!(starts, vec![0.0, 2.0, 4.0, 6.0]);
+    }
+
+    #[test]
+    fn drum_grid_snare_emits_on_odd_beats() {
+        let score = drum_grid(DrumGridConfig {
+            bars: 2,
+            lane: DrumLane::Snare,
+            ..Default::default()
+        });
+        assert_eq!(score.events.len(), 4);
+        let starts: Vec<f64> = score.events.iter().map(|e| e.start_beats).collect();
+        assert_eq!(starts, vec![1.0, 3.0, 5.0, 7.0]);
+    }
+
+    #[test]
+    fn drum_grid_eight_bars_has_sixteen_kicks() {
+        let score = drum_grid(DrumGridConfig {
+            bars: 8,
+            lane: DrumLane::Kick,
+            ..Default::default()
+        });
+        assert_eq!(score.events.len(), 16);
+        let last = score.events.last().expect("last kick");
+        assert!((last.start_beats - 30.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn drum_grid_start_times_are_monotonic() {
+        let score = drum_grid(DrumGridConfig {
+            bars: 4,
+            lane: DrumLane::Snare,
+            ..Default::default()
+        });
+        for window in score.events.windows(2) {
+            assert!(window[1].start_beats > window[0].start_beats);
+        }
     }
 }

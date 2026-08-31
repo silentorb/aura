@@ -95,6 +95,34 @@ pub fn music_node_library() -> NodeLibrary {
         },
     );
     types.insert(
+        "drum_grid".into(),
+        NodeType {
+            id: "drum_grid".into(),
+            inputs: BTreeMap::from([
+                (
+                    "tempo".into(),
+                    port("tempo", tempo.clone(), None),
+                ),
+                (
+                    "time_signature".into(),
+                    port("time_signature", time_signature.clone(), None),
+                ),
+                (
+                    "bars".into(),
+                    port("bars", control.clone(), Some(PrimitiveValue::Number(4.0))),
+                ),
+                (
+                    "lane".into(),
+                    port("lane", control.clone(), Some(PrimitiveValue::Number(0.0))),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "score".into(),
+                port("score", score.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
         "arpeggio".into(),
         NodeType {
             id: "arpeggio".into(),

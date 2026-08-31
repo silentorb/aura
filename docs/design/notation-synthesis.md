@@ -39,7 +39,7 @@ flowchart LR
 1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
 2. **Translation** — `translate_graph` composes pure `Sampler` closures.
 3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
-4. **Notation path** — `arpeggio`, `epic_minor_progression`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; schedule tables drive note gates at sample time.
+4. **Notation path** — `arpeggio`, `drum_grid`, `epic_minor_progression`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; schedule tables drive note gates at sample time.
 5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules
@@ -72,6 +72,15 @@ Long term, an entire song should be describable as a **single function**, with g
 
 By default, instruments resolve harmony **once at note-on** (`start_beats` / `start_frame`). They may optionally sample `ChordSignal` per frame (e.g. pitch glide across chord boundaries). The arpeggio demo uses the note-on default: semitone is baked into each `NoteEvent` at translate time.
 
+## Drum lanes in Imp graphs
+
+Percussion in the arpeggio demo uses **separate scores per lane** (kick and snare each get their own `drum_grid` → `note_at_time` chain) because different hits need different synthesis subgraphs. Lanes are mixed at sample time with an `add` node.
+
+- **Kick** — `exponential_sweep_sine` (closed-form pitch drop) × `linear_adsr` amplitude envelope.
+- **Snare** — deterministic noise through a **stateless high-pass** (`noise(t) - noise(t - dt)`), not an IIR filter, to stay compatible with seekable pure `f(t)` sampling ([ADR 0007](../decisions/0007-drop-fundsp.md)).
+
+Drum hits use `NoteEvent` timing only; semitone is unused on drum lanes.
+
 ## Ontology
 
 Aura models music in its own terms: semitones, scale degrees, intervals, chords, and keys. Frequency (`Hz`) is derived at synthesis boundaries via `Semitone::to_hz()`. MIDI compatibility, if ever needed, is an adapter concern — not the source of truth for notation types.
@@ -81,7 +90,7 @@ Aura models music in its own terms: semitones, scale degrees, intervals, chords,
 | Crate | Role |
 |-------|------|
 | [`aura-composition`](../../crates/aura-composition) | Notation types, beat↔second conversion |
-| [`aura-composer`](../../crates/aura-composer) | Procedural generators (e.g. arpeggios) |
+| [`aura-composer`](../../crates/aura-composer) | Procedural generators (e.g. arpeggios, drum grids) |
 | [`aura-scheduler`](../../crates/aura-scheduler) | Offline timeline, frame offsets, `ScheduleContext` |
 | [`aura-instrumentation`](../../crates/aura-instrumentation) | `Instrument` trait, per-note render, mix-down |
 | [`aura-imp`](../../crates/aura-imp) | Imp node libraries and JSON helpers |

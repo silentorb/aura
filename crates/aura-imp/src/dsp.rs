@@ -41,6 +41,73 @@ pub fn dsp_node_library() -> NodeLibrary {
         },
     );
     types.insert(
+        "exponential_sweep_sine".into(),
+        NodeType {
+            id: "exponential_sweep_sine".into(),
+            inputs: BTreeMap::from([
+                (
+                    "start_hz".into(),
+                    port(
+                        "start_hz",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(150.0)),
+                    ),
+                ),
+                (
+                    "decay_rate".into(),
+                    port(
+                        "decay_rate",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(12.0)),
+                    ),
+                ),
+                ("elapsed".into(), port("elapsed", time.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([(
+                "audio".into(),
+                port("audio", audio_mono.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "deterministic_noise".into(),
+        NodeType {
+            id: "deterministic_noise".into(),
+            inputs: BTreeMap::from([
+                (
+                    "seed".into(),
+                    port("seed", control.clone(), Some(PrimitiveValue::Number(0.0))),
+                ),
+                ("time".into(), port("time", time.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([(
+                "audio".into(),
+                port("audio", audio_mono.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "highpass_noise".into(),
+        NodeType {
+            id: "highpass_noise".into(),
+            inputs: BTreeMap::from([
+                (
+                    "seed".into(),
+                    port("seed", control.clone(), Some(PrimitiveValue::Number(0.0))),
+                ),
+                ("time".into(), port("time", time.clone(), None)),
+                (
+                    "dt".into(),
+                    port("dt", control.clone(), Some(PrimitiveValue::Number(0.000_1))),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "audio".into(),
+                port("audio", audio_mono.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
         "multiply".into(),
         NodeType {
             id: "multiply".into(),
@@ -50,7 +117,21 @@ pub fn dsp_node_library() -> NodeLibrary {
             ]),
             outputs: BTreeMap::from([(
                 "audio".into(),
-                port("audio", audio_mono, None),
+                port("audio", audio_mono.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "add".into(),
+        NodeType {
+            id: "add".into(),
+            inputs: BTreeMap::from([
+                ("a".into(), port("a", audio_mono.clone(), None)),
+                ("b".into(), port("b", audio_mono, None)),
+            ]),
+            outputs: BTreeMap::from([(
+                "audio".into(),
+                port("audio", signal(AUDIO_MONO), None),
             )]),
         },
     );
@@ -66,9 +147,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dsp_library_contains_sine_and_multiply() {
+    fn dsp_library_contains_expected_nodes() {
         let library = dsp_node_library();
         assert!(library.types.contains_key("sine"));
         assert!(library.types.contains_key("multiply"));
+        assert!(library.types.contains_key("add"));
+        assert!(library.types.contains_key("exponential_sweep_sine"));
+        assert!(library.types.contains_key("deterministic_noise"));
+        assert!(library.types.contains_key("highpass_noise"));
     }
 }

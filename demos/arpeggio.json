@@ -23,7 +23,9 @@
     "arp": {
       "id": "arp",
       "type": "arpeggio",
-      "inputs": {}
+      "inputs": {
+        "bars": 8.0
+      }
     },
     "note": {
       "id": "note",
@@ -58,6 +60,131 @@
     "voice": {
       "id": "voice",
       "type": "multiply",
+      "inputs": {}
+    },
+    "kick_grid": {
+      "id": "kick_grid",
+      "type": "drum_grid",
+      "inputs": {
+        "bars": 8.0,
+        "lane": 0.0
+      }
+    },
+    "kick_start": {
+      "id": "kick_start",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "kick_dur": {
+      "id": "kick_dur",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "kick_elapsed": {
+      "id": "kick_elapsed",
+      "type": "time_elapsed",
+      "inputs": {}
+    },
+    "kick_env": {
+      "id": "kick_env",
+      "type": "linear_adsr",
+      "inputs": {
+        "attack": 0.001,
+        "decay": 0.08,
+        "sustain": 0.0,
+        "release": 0.01
+      }
+    },
+    "kick_osc": {
+      "id": "kick_osc",
+      "type": "exponential_sweep_sine",
+      "inputs": {
+        "start_hz": 150.0,
+        "decay_rate": 12.0
+      }
+    },
+    "kick_voice": {
+      "id": "kick_voice",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "kick_gain": {
+      "id": "kick_gain",
+      "type": "parameter",
+      "inputs": {
+        "value": 0.9
+      }
+    },
+    "kick_out": {
+      "id": "kick_out",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "snare_grid": {
+      "id": "snare_grid",
+      "type": "drum_grid",
+      "inputs": {
+        "bars": 8.0,
+        "lane": 1.0
+      }
+    },
+    "snare_start": {
+      "id": "snare_start",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "snare_dur": {
+      "id": "snare_dur",
+      "type": "note_at_time",
+      "inputs": {}
+    },
+    "snare_elapsed": {
+      "id": "snare_elapsed",
+      "type": "time_elapsed",
+      "inputs": {}
+    },
+    "snare_env": {
+      "id": "snare_env",
+      "type": "linear_adsr",
+      "inputs": {
+        "attack": 0.001,
+        "decay": 0.12,
+        "sustain": 0.0,
+        "release": 0.01
+      }
+    },
+    "snare_noise": {
+      "id": "snare_noise",
+      "type": "highpass_noise",
+      "inputs": {
+        "dt": 0.0001
+      }
+    },
+    "snare_voice": {
+      "id": "snare_voice",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "snare_gain": {
+      "id": "snare_gain",
+      "type": "parameter",
+      "inputs": {
+        "value": 0.6
+      }
+    },
+    "snare_out": {
+      "id": "snare_out",
+      "type": "multiply",
+      "inputs": {}
+    },
+    "mix_arp_kick": {
+      "id": "mix_arp_kick",
+      "type": "add",
+      "inputs": {}
+    },
+    "mix_all": {
+      "id": "mix_all",
+      "type": "add",
       "inputs": {}
     },
     "out": {
@@ -135,8 +262,148 @@
       "from": { "node": "env", "port": "value" },
       "to": { "node": "voice", "port": "b" }
     },
-    "voice_to_out": {
+    "tempo_to_kick_grid": {
+      "from": { "node": "tempo", "port": "tempo" },
+      "to": { "node": "kick_grid", "port": "tempo" }
+    },
+    "meter_to_kick_grid": {
+      "from": { "node": "meter", "port": "time_signature" },
+      "to": { "node": "kick_grid", "port": "time_signature" }
+    },
+    "kick_grid_to_kick_start_score": {
+      "from": { "node": "kick_grid", "port": "score" },
+      "to": { "node": "kick_start", "port": "score" }
+    },
+    "kick_grid_to_kick_dur_score": {
+      "from": { "node": "kick_grid", "port": "score" },
+      "to": { "node": "kick_dur", "port": "score" }
+    },
+    "time_to_kick_start": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "kick_start", "port": "time" }
+    },
+    "time_to_kick_dur": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "kick_dur", "port": "time" }
+    },
+    "kick_start_to_kick_elapsed": {
+      "from": { "node": "kick_start", "port": "note_start" },
+      "to": { "node": "kick_elapsed", "port": "start" }
+    },
+    "time_to_kick_elapsed": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "kick_elapsed", "port": "time" }
+    },
+    "kick_elapsed_to_kick_osc": {
+      "from": { "node": "kick_elapsed", "port": "elapsed" },
+      "to": { "node": "kick_osc", "port": "elapsed" }
+    },
+    "kick_elapsed_to_kick_env": {
+      "from": { "node": "kick_elapsed", "port": "elapsed" },
+      "to": { "node": "kick_env", "port": "elapsed" }
+    },
+    "kick_dur_to_kick_env": {
+      "from": { "node": "kick_dur", "port": "note_duration" },
+      "to": { "node": "kick_env", "port": "note_duration" }
+    },
+    "kick_osc_to_kick_voice_a": {
+      "from": { "node": "kick_osc", "port": "audio" },
+      "to": { "node": "kick_voice", "port": "a" }
+    },
+    "kick_env_to_kick_voice_b": {
+      "from": { "node": "kick_env", "port": "value" },
+      "to": { "node": "kick_voice", "port": "b" }
+    },
+    "kick_voice_to_kick_out_a": {
+      "from": { "node": "kick_voice", "port": "audio" },
+      "to": { "node": "kick_out", "port": "a" }
+    },
+    "kick_gain_to_kick_out_b": {
+      "from": { "node": "kick_gain", "port": "value" },
+      "to": { "node": "kick_out", "port": "b" }
+    },
+    "tempo_to_snare_grid": {
+      "from": { "node": "tempo", "port": "tempo" },
+      "to": { "node": "snare_grid", "port": "tempo" }
+    },
+    "meter_to_snare_grid": {
+      "from": { "node": "meter", "port": "time_signature" },
+      "to": { "node": "snare_grid", "port": "time_signature" }
+    },
+    "snare_grid_to_snare_start_score": {
+      "from": { "node": "snare_grid", "port": "score" },
+      "to": { "node": "snare_start", "port": "score" }
+    },
+    "snare_grid_to_snare_dur_score": {
+      "from": { "node": "snare_grid", "port": "score" },
+      "to": { "node": "snare_dur", "port": "score" }
+    },
+    "time_to_snare_start": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "snare_start", "port": "time" }
+    },
+    "time_to_snare_dur": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "snare_dur", "port": "time" }
+    },
+    "snare_start_to_snare_elapsed": {
+      "from": { "node": "snare_start", "port": "note_start" },
+      "to": { "node": "snare_elapsed", "port": "start" }
+    },
+    "time_to_snare_elapsed": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "snare_elapsed", "port": "time" }
+    },
+    "snare_start_to_snare_noise_seed": {
+      "from": { "node": "snare_start", "port": "note_start" },
+      "to": { "node": "snare_noise", "port": "seed" }
+    },
+    "time_to_snare_noise": {
+      "from": { "node": "time", "port": "time" },
+      "to": { "node": "snare_noise", "port": "time" }
+    },
+    "snare_elapsed_to_snare_env": {
+      "from": { "node": "snare_elapsed", "port": "elapsed" },
+      "to": { "node": "snare_env", "port": "elapsed" }
+    },
+    "snare_dur_to_snare_env": {
+      "from": { "node": "snare_dur", "port": "note_duration" },
+      "to": { "node": "snare_env", "port": "note_duration" }
+    },
+    "snare_noise_to_snare_voice_a": {
+      "from": { "node": "snare_noise", "port": "audio" },
+      "to": { "node": "snare_voice", "port": "a" }
+    },
+    "snare_env_to_snare_voice_b": {
+      "from": { "node": "snare_env", "port": "value" },
+      "to": { "node": "snare_voice", "port": "b" }
+    },
+    "snare_voice_to_snare_out_a": {
+      "from": { "node": "snare_voice", "port": "audio" },
+      "to": { "node": "snare_out", "port": "a" }
+    },
+    "snare_gain_to_snare_out_b": {
+      "from": { "node": "snare_gain", "port": "value" },
+      "to": { "node": "snare_out", "port": "b" }
+    },
+    "voice_to_mix_arp_kick_a": {
       "from": { "node": "voice", "port": "audio" },
+      "to": { "node": "mix_arp_kick", "port": "a" }
+    },
+    "kick_out_to_mix_arp_kick_b": {
+      "from": { "node": "kick_out", "port": "audio" },
+      "to": { "node": "mix_arp_kick", "port": "b" }
+    },
+    "mix_arp_kick_to_mix_all_a": {
+      "from": { "node": "mix_arp_kick", "port": "audio" },
+      "to": { "node": "mix_all", "port": "a" }
+    },
+    "snare_out_to_mix_all_b": {
+      "from": { "node": "snare_out", "port": "audio" },
+      "to": { "node": "mix_all", "port": "b" }
+    },
+    "mix_all_to_out": {
+      "from": { "node": "mix_all", "port": "audio" },
       "to": { "node": "out", "port": "value" }
     }
   }

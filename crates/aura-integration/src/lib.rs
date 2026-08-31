@@ -150,10 +150,10 @@ mod tests {
         let graph = aura_imp::graph_from_json_str(json).expect("graph");
         let spec = SampleSpec {
             sample_rate: SampleRate::RATE_44100,
-            duration: DurationSpec::measures_4_4(4.0, aura_composition::Tempo::default()),
+            duration: DurationSpec::measures_4_4(8.0, aura_composition::Tempo::default()),
         };
         let pcm = render_graph_to_pcm(&graph, spec).expect("render");
-        assert_eq!(pcm.len(), 352_800);
+        assert_eq!(pcm.len(), 705_600);
     }
 
     #[test]
