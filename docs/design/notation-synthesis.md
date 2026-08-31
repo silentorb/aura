@@ -16,6 +16,8 @@ See also [`architecture.md`](architecture.md) and [`imp-execution.md`](imp-execu
 | **Semitone** | Discrete key pitch on the 12-TET chromatic scale; not a frequency |
 | **Chord** | Root, voiced tones, and optional bass — built from intervals and scale degrees |
 | **ChordProgression** | Timed sequence of chords on a beat grid; a **data signal** sampled per frame via `ChordSignal` (with wired tempo) |
+| **Loopable** | Type constraint (`Loopable`) satisfied by `score` and `chord_progression`; required type argument for the generic `loop` node |
+| **loop** | Generic Imp node `loop<T: Loopable>` — marks a score or progression as unboundedly looped (modulus over cycle length at playback) |
 | **Tempo** | Beats per minute; a **data signal** (`tempo` port type) composed at translate time |
 | **TimeSignature** | Beats per bar and beat unit; a **data signal** (`time_signature` port type) composed at translate time |
 | **Data signal** | Structured translate-time or sample-time value (e.g. `Score`, `ChordProgression`, `Tempo`, `TimeSignature`), distinct from scalar `Sampler` outputs |
@@ -39,7 +41,7 @@ flowchart LR
 1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
 2. **Translation** — `translate_graph` composes pure `Sampler` closures.
 3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
-4. **Notation path** — `arpeggio`, `drum_grid`, `epic_minor_progression`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; schedule tables drive note gates at sample time.
+4. **Notation path** — `arpeggio`, `drum_grid`, `epic_minor_progression`, `loop`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; generators emit **one cycle**; `loop` compositors repeat via modulus for the render duration.
 5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules
@@ -62,7 +64,7 @@ Aura favors **functional notation generation** over a fixed, destructive sequenc
 
 ### Rule 5: Modular nested patterns
 
-Every aspect of music production should be expressible as **modular, reusable patterns** organized into libraries. Patterns support nested abstraction and composition.
+Every aspect of music production should be expressible as **modular, reusable patterns** organized into libraries. Patterns support nested abstraction and composition. Generators (e.g. `arpeggio`, `drum_grid`) emit one finite cycle; the generic `loop<T: Loopable>` node applies unbounded repetition by modulus. Render duration is external (CLI `--duration`).
 
 ### Rule 6: Holistic song functions (target)
 

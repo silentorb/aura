@@ -1,6 +1,6 @@
 //! Sample-time note lookup from a score.
 
-use aura_composition::{Score, Semitone};
+use aura_composition::{Score, ScoreSignal, Semitone};
 use aura_sample::SampleRate;
 use aura_scheduler::schedule_offline;
 
@@ -14,6 +14,8 @@ pub struct ScheduledNote {
 #[derive(Debug, Clone)]
 pub struct NoteSchedule {
     notes: Vec<ScheduledNote>,
+    looping: bool,
+    duration_secs: f64,
 }
 
 impl NoteSchedule {
@@ -30,10 +32,25 @@ impl NoteSchedule {
             })
             .collect();
 
-        Self { notes }
+        Self {
+            notes,
+            looping: false,
+            duration_secs: score.duration_secs(),
+        }
+    }
+
+    pub fn from_score_signal(signal: &ScoreSignal, sample_rate: SampleRate) -> Self {
+        let mut schedule = Self::from_score(&signal.score, sample_rate);
+        schedule.looping = signal.looping;
+        schedule
     }
 
     pub fn active_at(&self, t: f64) -> Option<&ScheduledNote> {
+        let t = if self.looping && self.duration_secs > 1e-9 {
+            t % self.duration_secs
+        } else {
+            t
+        };
         self.notes.iter().find(|note| {
             t >= note.start_secs && t < note.start_secs + note.duration_secs
         })
@@ -48,11 +65,21 @@ mod tests {
     #[test]
     fn active_at_finds_note_window() {
         let score = arpeggio(ArpeggioConfig {
-            bars: 1,
+            subdivision: 16,
             ..Default::default()
         });
         let schedule = NoteSchedule::from_score(&score, SampleRate::RATE_44100);
         assert!(schedule.active_at(0.0).is_some());
         assert!(schedule.active_at(10.0).is_none());
+    }
+
+    #[test]
+    fn active_at_wraps_when_looping() {
+        let score = arpeggio(ArpeggioConfig::default());
+        let signal = ScoreSignal::finite(score).with_looping(true);
+        let schedule = NoteSchedule::from_score_signal(&signal, SampleRate::RATE_44100);
+        let cycle = schedule.duration_secs;
+        assert!(schedule.active_at(cycle).is_some());
+        assert!(schedule.active_at(cycle + 0.01).is_some());
     }
 }

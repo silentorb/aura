@@ -136,6 +136,14 @@ pub struct ChordProgression {
 }
 
 impl ChordProgression {
+    /// Total span in quarter-note beats (end of last region).
+    pub fn duration_beats(&self) -> f64 {
+        self.regions
+            .iter()
+            .map(|region| region.start_beats + region.duration_beats)
+            .fold(0.0_f64, f64::max)
+    }
+
     /// Active chord at the given beat position (quarter-note beat grid).
     pub fn chord_at_beats(&self, beat: f64) -> &Chord {
         self.regions
@@ -190,6 +198,77 @@ pub trait ChordSignal: Send + Sync {
 impl ChordSignal for ChordProgression {
     fn chord_at(&self, time_secs: f64, tempo: Tempo) -> Chord {
         self.chord_at_secs(time_secs, tempo).clone()
+    }
+}
+
+/// Chord progression with optional unbounded loop (modulus over cycle length).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProgressionSignal {
+    pub progression: ChordProgression,
+    pub looping: bool,
+}
+
+impl ProgressionSignal {
+    pub fn finite(progression: ChordProgression) -> Self {
+        Self {
+            progression,
+            looping: false,
+        }
+    }
+
+    pub fn with_looping(mut self, looping: bool) -> Self {
+        self.looping = looping;
+        self
+    }
+
+    pub fn chord_at_beats(&self, beat: f64) -> &Chord {
+        let beat = if self.looping {
+            wrap_beat(beat, self.progression.duration_beats())
+        } else {
+            beat
+        };
+        self.progression.chord_at_beats(beat)
+    }
+}
+
+impl ChordSignal for ProgressionSignal {
+    fn chord_at(&self, time_secs: f64, tempo: Tempo) -> Chord {
+        let beat = time_secs / tempo.seconds_per_beat();
+        self.chord_at_beats(beat).clone()
+    }
+}
+
+/// Score with optional unbounded loop (modulus over cycle duration at sample time).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScoreSignal {
+    pub score: Score,
+    pub looping: bool,
+}
+
+impl ScoreSignal {
+    pub fn finite(score: Score) -> Self {
+        Self {
+            score,
+            looping: false,
+        }
+    }
+
+    pub fn with_looping(mut self, looping: bool) -> Self {
+        self.looping = looping;
+        self
+    }
+}
+
+/// Wraps beat time into `[0, cycle_beats)` for looped lookup.
+pub fn wrap_beat(beat: f64, cycle_beats: f64) -> f64 {
+    if cycle_beats <= 1e-9 {
+        return beat;
+    }
+    let wrapped = beat % cycle_beats;
+    if wrapped < 0.0 {
+        wrapped + cycle_beats
+    } else {
+        wrapped
     }
 }
 
@@ -362,6 +441,47 @@ mod tests {
         );
         assert!((score.duration_beats() - 3.0).abs() < 1e-9);
         assert!((score.duration_secs() - 1.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn progression_duration_beats() {
+        let progression = ChordProgression {
+            regions: vec![
+                ChordRegion {
+                    start_beats: 0.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_i(Semitone::A3),
+                },
+                ChordRegion {
+                    start_beats: 4.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_vi(Semitone::A3),
+                },
+            ],
+        };
+        assert!((progression.duration_beats() - 8.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn looped_progression_repeats_at_cycle_boundary() {
+        let progression = ProgressionSignal::finite(ChordProgression {
+            regions: vec![
+                ChordRegion {
+                    start_beats: 0.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_i(Semitone::A3),
+                },
+                ChordRegion {
+                    start_beats: 4.0,
+                    duration_beats: 4.0,
+                    chord: NaturalMinor::triad_vi(Semitone::A3),
+                },
+            ],
+        })
+        .with_looping(true);
+        assert_eq!(progression.chord_at_beats(0.0).root.0, 57);
+        assert_eq!(progression.chord_at_beats(16.0).root.0, 57);
+        assert_eq!(progression.chord_at_beats(20.0).root.0, 65);
     }
 
     #[test]

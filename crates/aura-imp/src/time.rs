@@ -1,6 +1,6 @@
 //! Time source node library.
 
-use crate::signals::{signal, CONTROL, TIME};
+use crate::signals::{signal, TIME};
 use imp_core_types::{NodeLibrary, NodeType, Port, PrimitiveValue};
 use std::collections::BTreeMap;
 
@@ -15,7 +15,6 @@ fn port(id: &str, signal_type: imp_core_types::SignalType, default_value: Option
 /// Returns the Aura time node library.
 pub fn time_node_library() -> NodeLibrary {
     let time = signal(TIME);
-    let control = signal(CONTROL);
 
     let mut types = BTreeMap::new();
     types.insert(
@@ -39,7 +38,7 @@ pub fn time_node_library() -> NodeLibrary {
             implementation: None,
             inputs: BTreeMap::from([
                 ("time".into(), port("time", time.clone(), None)),
-                ("start".into(), port("start", control, None)),
+                ("start".into(), port("start", time.clone(), None)),
             ]),
             outputs: BTreeMap::from([(
                 "elapsed".into(),

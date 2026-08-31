@@ -23,6 +23,9 @@ pub const TEMPO: &str = "tempo";
 /// Time signature (translate-time data signal).
 pub const TIME_SIGNATURE: &str = "time_signature";
 
+/// Top type for polymorphic scalar inputs (e.g. noise seed from time or control).
+pub const ANY: &str = "any";
+
 pub fn signal(id: &str) -> SignalType {
     concrete_type(id, vec![])
 }

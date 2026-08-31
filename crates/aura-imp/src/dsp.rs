@@ -1,6 +1,6 @@
 //! Aura DSP node library.
 
-use crate::signals::{signal, AUDIO_MONO, CONTROL, TIME};
+use crate::signals::{signal, ANY, AUDIO_MONO, CONTROL, TIME};
 use imp_core_types::{NodeLibrary, NodeType, Port, PrimitiveValue};
 use std::collections::BTreeMap;
 
@@ -82,7 +82,7 @@ pub fn dsp_node_library() -> NodeLibrary {
             inputs: BTreeMap::from([
                 (
                     "seed".into(),
-                    port("seed", control.clone(), Some(PrimitiveValue::Number(0.0))),
+                    port("seed", signal(ANY), Some(PrimitiveValue::Number(0.0))),
                 ),
                 ("time".into(), port("time", time.clone(), None)),
             ]),
@@ -101,7 +101,7 @@ pub fn dsp_node_library() -> NodeLibrary {
             inputs: BTreeMap::from([
                 (
                     "seed".into(),
-                    port("seed", control.clone(), Some(PrimitiveValue::Number(0.0))),
+                    port("seed", signal(ANY), Some(PrimitiveValue::Number(0.0))),
                 ),
                 ("time".into(), port("time", time.clone(), None)),
                 (
@@ -123,7 +123,7 @@ pub fn dsp_node_library() -> NodeLibrary {
             implementation: None,
             inputs: BTreeMap::from([
                 ("a".into(), port("a", audio_mono.clone(), None)),
-                ("b".into(), port("b", audio_mono.clone(), None)),
+                ("b".into(), port("b", control.clone(), None)),
             ]),
             outputs: BTreeMap::from([(
                 "audio".into(),

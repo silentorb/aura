@@ -15,6 +15,7 @@ aura-io-wav = { path = "../aura-io-wav" }
 aura-render = { path = "../aura-render" }
 aura-sample = { path = "../aura-sample" }
 aura-scheduler = { path = "../aura-scheduler" }
+imp_typecheck = { workspace = true }
 serde_json = "1"
 thiserror = { workspace = true }
 

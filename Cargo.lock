@@ -88,6 +88,7 @@ dependencies = [
  "aura-render",
  "aura-sample",
  "aura-scheduler",
+ "imp_typecheck",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
@@ -399,6 +400,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
+name = "imp_collection_transforms"
+version = "0.1.0"
+dependencies = [
+ "imp_core_types",
+ "imp_registry",
+]
+
+[[package]]
 name = "imp_core_types"
 version = "0.1.0"
 dependencies = [
@@ -410,6 +419,16 @@ name = "imp_registry"
 version = "0.1.0"
 dependencies = [
  "imp_core_types",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "imp_typecheck"
+version = "0.1.0"
+dependencies = [
+ "imp_collection_transforms",
+ "imp_core_types",
+ "imp_registry",
  "thiserror 2.0.20",
 ]
 

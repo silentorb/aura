@@ -71,7 +71,7 @@ mod tests {
 
     fn arpeggio_score() -> Score {
         aura_composer::arpeggio(aura_composer::ArpeggioConfig {
-            bars: 1,
+            subdivision: 16,
             ..Default::default()
         })
     }

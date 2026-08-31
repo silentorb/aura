@@ -1,20 +1,32 @@
 //! Aura Imp registry and JSON helpers.
 
-use crate::{dsp, envelope, music, time};
+use crate::{constraints, dsp, envelope, music, time};
 use imp_core_types::Graph;
-use imp_registry::{create_registry, load_library, DuplicateNodeTypeError, Registry};
+use imp_registry::{
+    create_registry, load_library, load_type_constraint_library, DuplicateNodeTypeError,
+    DuplicateTypeConstraintError, Registry,
+};
 use std::fs;
 use std::path::Path;
 use thiserror::Error;
 
 /// Returns a registry with core Imp nodes and all Aura libraries loaded.
-pub fn aura_registry() -> Result<Registry, DuplicateNodeTypeError> {
+pub fn aura_registry() -> Result<Registry, RegistryError> {
     let registry = create_registry();
     let registry = load_library(registry, imp_core_types::core_node_library())?;
+    let registry = load_type_constraint_library(registry, constraints::aura_type_constraint_library())?;
     let registry = load_library(registry, time::time_node_library())?;
     let registry = load_library(registry, dsp::dsp_node_library())?;
     let registry = load_library(registry, envelope::envelope_node_library())?;
-    load_library(registry, music::music_node_library())
+    load_library(registry, music::music_node_library()).map_err(RegistryError::from)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RegistryError {
+    #[error(transparent)]
+    DuplicateNodeType(#[from] DuplicateNodeTypeError),
+    #[error(transparent)]
+    DuplicateTypeConstraint(#[from] DuplicateTypeConstraintError),
 }
 
 #[derive(Debug, Error)]
@@ -70,5 +82,6 @@ mod tests {
         assert!(get_node_type(&registry, "epic_minor_progression").is_some());
         assert!(get_node_type(&registry, "constant_tempo").is_some());
         assert!(get_node_type(&registry, "constant_time_signature").is_some());
+        assert!(get_node_type(&registry, "loop").is_some());
     }
 }

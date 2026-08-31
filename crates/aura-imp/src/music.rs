@@ -1,9 +1,13 @@
 //! Musical composition node library.
 
+use crate::constraints::LOOPABLE;
 use crate::signals::{
     signal, CHORD_PROGRESSION, CONTROL, SCORE, TEMPO, TIME, TIME_SIGNATURE,
 };
-use imp_core_types::{NodeLibrary, NodeType, Port, PrimitiveValue};
+use imp_core_types::{
+    ImplementationCase, NodeImplementation, NodeLibrary, NodeType, Port, PrimitiveValue, TypeParam,
+};
+use imp_core_types::{concrete_type, type_var};
 use std::collections::BTreeMap;
 
 fn port(id: &str, signal_type: imp_core_types::SignalType, default_value: Option<PrimitiveValue>) -> Port {
@@ -116,10 +120,6 @@ pub fn music_node_library() -> NodeLibrary {
                     port("time_signature", time_signature.clone(), None),
                 ),
                 (
-                    "bars".into(),
-                    port("bars", control.clone(), Some(PrimitiveValue::Number(4.0))),
-                ),
-                (
                     "lane".into(),
                     port("lane", control.clone(), Some(PrimitiveValue::Number(0.0))),
                 ),
@@ -127,6 +127,38 @@ pub fn music_node_library() -> NodeLibrary {
             outputs: BTreeMap::from([(
                 "score".into(),
                 port("score", score.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "loop".into(),
+        NodeType {
+            id: "loop".into(),
+            type_params: vec![TypeParam {
+                id: "T".into(),
+                bounds: vec![LOOPABLE.into()],
+            }],
+            implementation: Some(NodeImplementation::Dispatch {
+                param_index: Some(0),
+                cases: vec![
+                    ImplementationCase {
+                        match_type: concrete_type(SCORE, vec![]),
+                        implementation: "loop_score".into(),
+                    },
+                    ImplementationCase {
+                        match_type: concrete_type(CHORD_PROGRESSION, vec![]),
+                        implementation: "loop_progression".into(),
+                    },
+                ],
+                default: None,
+            }),
+            inputs: BTreeMap::from([(
+                "value".into(),
+                port("value", type_var("T"), None),
+            )]),
+            outputs: BTreeMap::from([(
+                "value".into(),
+                port("value", type_var("T"), None),
             )]),
         },
     );
@@ -148,10 +180,6 @@ pub fn music_node_library() -> NodeLibrary {
                 (
                     "time_signature".into(),
                     port("time_signature", time_signature.clone(), None),
-                ),
-                (
-                    "bars".into(),
-                    port("bars", control.clone(), Some(PrimitiveValue::Number(4.0))),
                 ),
                 (
                     "subdivision".into(),

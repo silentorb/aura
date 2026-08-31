@@ -4,12 +4,16 @@ mod note_schedule;
 
 use note_schedule::NoteSchedule;
 use aura_composer::{arpeggio, drum_grid, epic_minor_progression, ArpeggioConfig, DrumGridConfig, DrumLane};
-use aura_composition::{ChordProgression, ChordSignal, Score, Semitone, Tempo, TimeSignature};
+use aura_composition::{
+    ChordProgression, ChordSignal, ProgressionSignal, Score, ScoreSignal, Semitone, Tempo,
+    TimeSignature,
+};
 use aura_dsp::{add, deterministic_noise, exponential_sweep_sine, highpass_noise, multiply, sine};
 use aura_imp::{Graph, Node, NodeId, PortReference, PrimitiveValue, Registry};
 use aura_instrumentation::LinearAdsr;
 use aura_render::Sampler;
 use aura_sample::SampleRate;
+use imp_typecheck::check_graph;
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
@@ -39,12 +43,16 @@ pub enum TranslateError {
     InvalidTempoSource { node: NodeId },
     #[error("time signature input on node `{node}` must connect to a time signature node")]
     InvalidTimeSignatureSource { node: NodeId },
+    #[error("loopable input on node `{node}` must connect to a score or chord progression node")]
+    InvalidLoopableSource { node: NodeId },
+    #[error("graph type check failed: {message}")]
+    TypeCheck { message: String },
 }
 
 enum NodeValue {
     Signal(Box<dyn Sampler>),
-    Score(Score),
-    ChordProgression(ChordProgression),
+    ScoreSignal(ScoreSignal),
+    ProgressionSignal(ProgressionSignal),
     Tempo(Tempo),
     TimeSignature(TimeSignature),
 }
@@ -55,6 +63,13 @@ pub fn translate_graph(
     registry: &Registry,
     sample_rate: SampleRate,
 ) -> Result<Box<dyn Sampler>, TranslateError> {
+    let type_errors = check_graph(graph, registry);
+    if let Some(error) = type_errors.first() {
+        return Err(TranslateError::TypeCheck {
+            message: error.message.clone(),
+        });
+    }
+
     let output_node = find_output_node(graph)?;
     let edges_by_target = index_edges_by_target(graph);
     let mut visiting = BTreeSet::new();
@@ -69,8 +84,8 @@ pub fn translate_graph(
         "value",
     )? {
         NodeValue::Signal(sampler) => Ok(sampler),
-        NodeValue::Score(_)
-        | NodeValue::ChordProgression(_)
+        NodeValue::ScoreSignal(_)
+        | NodeValue::ProgressionSignal(_)
         | NodeValue::Tempo(_)
         | NodeValue::TimeSignature(_) => {
             Err(TranslateError::MissingOutputPort {
@@ -395,7 +410,7 @@ fn translate_node(
             )?;
             Ok(NodeValue::Signal(Box::new(SemitoneToHzSampler { semitone })))
         }
-        "epic_minor_progression" => Ok(NodeValue::ChordProgression(
+        "epic_minor_progression" => Ok(NodeValue::ProgressionSignal(ProgressionSignal::finite(
             build_epic_minor_progression(
                 graph,
                 registry,
@@ -404,7 +419,7 @@ fn translate_node(
                 visiting,
                 node,
             )?,
-        )),
+        ))),
         "constant_tempo" => Ok(NodeValue::Tempo(build_constant_tempo(node)?)),
         "constant_time_signature" => Ok(NodeValue::TimeSignature(
             build_constant_time_signature(node)?,
@@ -427,22 +442,30 @@ fn translate_node(
             node_id,
             output_port,
         ),
-        "arpeggio" => Ok(NodeValue::Score(build_arpeggio_score(
+        "arpeggio" => Ok(NodeValue::ScoreSignal(ScoreSignal::finite(build_arpeggio_score(
             graph,
             registry,
             sample_rate,
             edges_by_target,
             visiting,
             node,
-        )?)),
-        "drum_grid" => Ok(NodeValue::Score(build_drum_grid_score(
+        )?))),
+        "drum_grid" => Ok(NodeValue::ScoreSignal(ScoreSignal::finite(build_drum_grid_score(
             graph,
             registry,
             sample_rate,
             edges_by_target,
             visiting,
             node,
-        )?)),
+        )?))),
+        "loop" => translate_loop_value(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node_id,
+        ),
         "note_at_time" => translate_note_at_time_port(
             graph,
             registry,
@@ -462,7 +485,7 @@ fn translate_node(
             output_port,
         ),
         "note_envelope" => {
-            let score = resolve_score_input(
+            let score_signal = resolve_score_signal_input(
                 graph,
                 registry,
                 sample_rate,
@@ -471,7 +494,7 @@ fn translate_node(
                 node_id,
                 "score",
             )?;
-            let schedule = NoteSchedule::from_score(&score, sample_rate);
+            let schedule = NoteSchedule::from_score_signal(&score_signal, sample_rate);
             Ok(NodeValue::Signal(Box::new(NoteEnvelopeSampler {
                 schedule,
                 adsr: LinearAdsr::default(),
@@ -499,7 +522,7 @@ fn translate_note_at_time_port(
     node_id: &str,
     output_port: &str,
 ) -> Result<NodeValue, TranslateError> {
-    let score = resolve_score_input(
+    let score_signal = resolve_score_signal_input(
         graph,
         registry,
         sample_rate,
@@ -508,7 +531,7 @@ fn translate_note_at_time_port(
         node_id,
         "score",
     )?;
-    let schedule = NoteSchedule::from_score(&score, sample_rate);
+    let schedule = NoteSchedule::from_score_signal(&score_signal, sample_rate);
 
     let sampler: Box<dyn Sampler> = match output_port {
         "semitone" => Box::new(NoteSemitoneSampler { schedule }),
@@ -535,7 +558,7 @@ fn translate_chord_at_time_port(
     node_id: &str,
     output_port: &str,
 ) -> Result<NodeValue, TranslateError> {
-    let progression = resolve_progression_input(
+    let progression = resolve_progression_signal_input(
         graph,
         registry,
         sample_rate,
@@ -660,7 +683,35 @@ fn translate_time_signature_at_time_port(
     Ok(NodeValue::Signal(sampler))
 }
 
-fn resolve_score_input(
+fn translate_loop_value(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+) -> Result<NodeValue, TranslateError> {
+    let source = wired_source(edges_by_target, node_id, "value")?;
+    match translate_node(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &source.node,
+        &source.port,
+    )? {
+        NodeValue::ScoreSignal(signal) => Ok(NodeValue::ScoreSignal(signal.with_looping(true))),
+        NodeValue::ProgressionSignal(signal) => {
+            Ok(NodeValue::ProgressionSignal(signal.with_looping(true)))
+        }
+        _ => Err(TranslateError::InvalidLoopableSource {
+            node: node_id.into(),
+        }),
+    }
+}
+
+fn resolve_score_signal_input(
     graph: &Graph,
     registry: &Registry,
     sample_rate: SampleRate,
@@ -668,7 +719,7 @@ fn resolve_score_input(
     visiting: &mut BTreeSet<NodeId>,
     node_id: &str,
     port: &str,
-) -> Result<Score, TranslateError> {
+) -> Result<ScoreSignal, TranslateError> {
     let source = wired_source(edges_by_target, node_id, port)?;
     match translate_node(
         graph,
@@ -679,14 +730,14 @@ fn resolve_score_input(
         &source.node,
         &source.port,
     )? {
-        NodeValue::Score(score) => Ok(score),
+        NodeValue::ScoreSignal(signal) => Ok(signal),
         _ => Err(TranslateError::InvalidScoreSource {
             node: source.node,
         }),
     }
 }
 
-fn resolve_progression_input(
+fn resolve_progression_signal_input(
     graph: &Graph,
     registry: &Registry,
     sample_rate: SampleRate,
@@ -694,7 +745,7 @@ fn resolve_progression_input(
     visiting: &mut BTreeSet<NodeId>,
     node_id: &str,
     port: &str,
-) -> Result<ChordProgression, TranslateError> {
+) -> Result<ProgressionSignal, TranslateError> {
     let source = wired_source(edges_by_target, node_id, port)?;
     match translate_node(
         graph,
@@ -705,7 +756,7 @@ fn resolve_progression_input(
         &source.node,
         &source.port,
     )? {
-        NodeValue::ChordProgression(progression) => Ok(progression),
+        NodeValue::ProgressionSignal(signal) => Ok(signal),
         _ => Err(TranslateError::InvalidProgressionSource {
             node: source.node,
         }),
@@ -793,10 +844,10 @@ fn signal_input(
         &source.port,
     )? {
         NodeValue::Signal(sampler) => Ok(sampler),
-        NodeValue::Score(_) => Err(TranslateError::InvalidScoreSource {
+        NodeValue::ScoreSignal(_) => Err(TranslateError::InvalidScoreSource {
             node: source.node,
         }),
-        NodeValue::ChordProgression(_) => Err(TranslateError::InvalidProgressionSource {
+        NodeValue::ProgressionSignal(_) => Err(TranslateError::InvalidProgressionSource {
             node: source.node,
         }),
         NodeValue::Tempo(_) => Err(TranslateError::InvalidTempoSource {
@@ -859,7 +910,7 @@ fn build_arpeggio_score(
     visiting: &mut BTreeSet<NodeId>,
     node: &Node,
 ) -> Result<Score, TranslateError> {
-    let progression = resolve_progression_input(
+    let progression = resolve_progression_signal_input(
         graph,
         registry,
         sample_rate,
@@ -886,14 +937,12 @@ fn build_arpeggio_score(
         &node.id,
         "time_signature",
     )?;
-    let bars = read_number_input(node, "bars", 4.0)? as u32;
     let subdivision = read_number_input(node, "subdivision", 4.0)? as u8;
 
     Ok(arpeggio(ArpeggioConfig {
-        progression,
+        progression: progression.progression,
         tempo,
         time_signature,
-        bars,
         subdivision,
     }))
 }
@@ -924,7 +973,6 @@ fn build_drum_grid_score(
         &node.id,
         "time_signature",
     )?;
-    let bars = read_number_input(node, "bars", 4.0)? as u32;
     let lane_value = read_number_input(node, "lane", 0.0)? as i32;
     let lane = match lane_value {
         0 => DrumLane::Kick,
@@ -935,7 +983,6 @@ fn build_drum_grid_score(
     Ok(drum_grid(DrumGridConfig {
         tempo,
         time_signature,
-        bars,
         lane,
         hit_duration_beats: 0.25,
     }))
@@ -1187,7 +1234,7 @@ impl Sampler for NoteEnvelopeSampler {
 }
 
 struct ChordRootSampler {
-    progression: ChordProgression,
+    progression: ProgressionSignal,
     tempo: Tempo,
 }
 
@@ -1198,14 +1245,18 @@ impl Sampler for ChordRootSampler {
 }
 
 struct ChordActiveSampler {
-    progression: ChordProgression,
+    progression: ProgressionSignal,
     tempo: Tempo,
 }
 
 impl Sampler for ChordActiveSampler {
     fn at(&self, t: f64) -> f32 {
+        if self.progression.looping {
+            return 1.0;
+        }
         let beat = t / self.tempo.seconds_per_beat();
         if self
+            .progression
             .progression
             .regions
             .iter()
@@ -1268,8 +1319,7 @@ pub fn infer_score_duration_secs(graph: &Graph, sample_rate: SampleRate) -> Opti
         score_node,
     )
     .ok()?;
-    let schedule = aura_scheduler::schedule_offline(&score, sample_rate).ok()?;
-    Some(schedule.total_frames as f64 / sample_rate.get() as f64)
+    Some(score.duration_secs())
 }
 
 #[cfg(test)]
@@ -1284,5 +1334,64 @@ mod tests {
         let registry = aura_registry().expect("registry");
         let sampler = translate_graph(&graph, &registry, SampleRate::RATE_44100).expect("translate");
         assert_eq!(sampler.at(0.25), sampler.at(0.25));
+    }
+
+    #[test]
+    fn translate_arpeggio_graph_with_loop_nodes() {
+        let json = include_str!("../../../../demos/arpeggio.json");
+        let graph = aura_imp::graph_from_json_str(json).expect("graph");
+        let registry = aura_registry().expect("registry");
+        translate_graph(&graph, &registry, SampleRate::RATE_44100).expect("translate");
+    }
+
+    #[test]
+    fn typecheck_rejects_loop_wired_to_tempo() {
+        use aura_imp::{Edge, Graph, Node, PortReference};
+
+        let registry = aura_registry().expect("registry");
+        let graph = Graph {
+            nodes: BTreeMap::from([
+                (
+                    "tempo".into(),
+                    Node {
+                        id: "tempo".into(),
+                        node_type: "constant_tempo".into(),
+                        type_args: vec![],
+                        inputs: BTreeMap::new(),
+                    },
+                ),
+                (
+                    "bad_loop".into(),
+                    Node {
+                        id: "bad_loop".into(),
+                        node_type: "loop".into(),
+                        type_args: vec![],
+                        inputs: BTreeMap::new(),
+                    },
+                ),
+            ]),
+            edges: BTreeMap::from([(
+                "e1".into(),
+                Edge {
+                    from: PortReference {
+                        node: "tempo".into(),
+                        port: "tempo".into(),
+                    },
+                    to: PortReference {
+                        node: "bad_loop".into(),
+                        port: "value".into(),
+                    },
+                },
+            )]),
+        };
+
+        let errors = check_graph(&graph, &registry);
+        assert!(
+            errors.iter().any(|e| e.message.contains("Loopable")
+                || e.message.contains("does not satisfy bound")
+                || e.message.contains("incompatible")),
+            "expected type error for tempo into loop, got: {:?}",
+            errors
+        );
     }
 }

@@ -44,7 +44,7 @@ pub fn envelope_node_library() -> NodeLibrary {
                 ("elapsed".into(), port("elapsed", time.clone(), None)),
                 (
                     "note_duration".into(),
-                    port("note_duration", control.clone(), None),
+                    port("note_duration", time.clone(), None),
                 ),
             ]),
             outputs: BTreeMap::from([(

@@ -20,12 +20,20 @@
       "type": "epic_minor_progression",
       "inputs": {}
     },
+    "loop_prog": {
+      "id": "loop_prog",
+      "type": "loop",
+      "inputs": {}
+    },
     "arp": {
       "id": "arp",
       "type": "arpeggio",
-      "inputs": {
-        "bars": 8.0
-      }
+      "inputs": {}
+    },
+    "loop_arp": {
+      "id": "loop_arp",
+      "type": "loop",
+      "inputs": {}
     },
     "note": {
       "id": "note",
@@ -66,9 +74,13 @@
       "id": "kick_grid",
       "type": "drum_grid",
       "inputs": {
-        "bars": 8.0,
         "lane": 0.0
       }
+    },
+    "loop_kick": {
+      "id": "loop_kick",
+      "type": "loop",
+      "inputs": {}
     },
     "kick_start": {
       "id": "kick_start",
@@ -124,9 +136,13 @@
       "id": "snare_grid",
       "type": "drum_grid",
       "inputs": {
-        "bars": 8.0,
         "lane": 1.0
       }
+    },
+    "loop_snare": {
+      "id": "loop_snare",
+      "type": "loop",
+      "inputs": {}
     },
     "snare_start": {
       "id": "snare_start",
@@ -206,20 +222,28 @@
       "from": { "node": "meter", "port": "time_signature" },
       "to": { "node": "arp", "port": "time_signature" }
     },
-    "prog_to_arp": {
+    "prog_to_loop_prog": {
       "from": { "node": "prog", "port": "progression" },
+      "to": { "node": "loop_prog", "port": "value" }
+    },
+    "loop_prog_to_arp": {
+      "from": { "node": "loop_prog", "port": "value" },
       "to": { "node": "arp", "port": "progression" }
     },
-    "arp_to_note_score": {
+    "arp_to_loop_arp": {
       "from": { "node": "arp", "port": "score" },
+      "to": { "node": "loop_arp", "port": "value" }
+    },
+    "loop_arp_to_note_score": {
+      "from": { "node": "loop_arp", "port": "value" },
       "to": { "node": "note", "port": "score" }
     },
-    "arp_to_start_score": {
-      "from": { "node": "arp", "port": "score" },
+    "loop_arp_to_start_score": {
+      "from": { "node": "loop_arp", "port": "value" },
       "to": { "node": "start", "port": "score" }
     },
-    "arp_to_env_score": {
-      "from": { "node": "arp", "port": "score" },
+    "loop_arp_to_env_score": {
+      "from": { "node": "loop_arp", "port": "value" },
       "to": { "node": "env", "port": "score" }
     },
     "time_to_note": {
@@ -270,12 +294,16 @@
       "from": { "node": "meter", "port": "time_signature" },
       "to": { "node": "kick_grid", "port": "time_signature" }
     },
-    "kick_grid_to_kick_start_score": {
+    "kick_grid_to_loop_kick": {
       "from": { "node": "kick_grid", "port": "score" },
+      "to": { "node": "loop_kick", "port": "value" }
+    },
+    "loop_kick_to_kick_start_score": {
+      "from": { "node": "loop_kick", "port": "value" },
       "to": { "node": "kick_start", "port": "score" }
     },
-    "kick_grid_to_kick_dur_score": {
-      "from": { "node": "kick_grid", "port": "score" },
+    "loop_kick_to_kick_dur_score": {
+      "from": { "node": "loop_kick", "port": "value" },
       "to": { "node": "kick_dur", "port": "score" }
     },
     "time_to_kick_start": {
@@ -330,12 +358,16 @@
       "from": { "node": "meter", "port": "time_signature" },
       "to": { "node": "snare_grid", "port": "time_signature" }
     },
-    "snare_grid_to_snare_start_score": {
+    "snare_grid_to_loop_snare": {
       "from": { "node": "snare_grid", "port": "score" },
+      "to": { "node": "loop_snare", "port": "value" }
+    },
+    "loop_snare_to_snare_start_score": {
+      "from": { "node": "loop_snare", "port": "value" },
       "to": { "node": "snare_start", "port": "score" }
     },
-    "snare_grid_to_snare_dur_score": {
-      "from": { "node": "snare_grid", "port": "score" },
+    "loop_snare_to_snare_dur_score": {
+      "from": { "node": "loop_snare", "port": "value" },
       "to": { "node": "snare_dur", "port": "score" }
     },
     "time_to_snare_start": {
