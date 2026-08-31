@@ -5,6 +5,16 @@
       "type": "time",
       "inputs": {}
     },
+    "tempo": {
+      "id": "tempo",
+      "type": "constant_tempo",
+      "inputs": {}
+    },
+    "meter": {
+      "id": "meter",
+      "type": "constant_time_signature",
+      "inputs": {}
+    },
     "prog": {
       "id": "prog",
       "type": "epic_minor_progression",
@@ -57,6 +67,18 @@
     }
   },
   "edges": {
+    "meter_to_prog": {
+      "from": { "node": "meter", "port": "time_signature" },
+      "to": { "node": "prog", "port": "time_signature" }
+    },
+    "tempo_to_arp": {
+      "from": { "node": "tempo", "port": "tempo" },
+      "to": { "node": "arp", "port": "tempo" }
+    },
+    "meter_to_arp": {
+      "from": { "node": "meter", "port": "time_signature" },
+      "to": { "node": "arp", "port": "time_signature" }
+    },
     "prog_to_arp": {
       "from": { "node": "prog", "port": "progression" },
       "to": { "node": "arp", "port": "progression" }

@@ -15,8 +15,10 @@ See also [`architecture.md`](architecture.md) and [`imp-execution.md`](imp-execu
 | **Notation** | Types describing musical material: semitones, time, events, scores, chords |
 | **Semitone** | Discrete key pitch on the 12-TET chromatic scale; not a frequency |
 | **Chord** | Root, voiced tones, and optional bass — built from intervals and scale degrees |
-| **ChordProgression** | Timed sequence of chords; a **data signal** sampled per frame via `ChordSignal` |
-| **Data signal** | Structured translate-time or sample-time value (e.g. `Score`, `ChordProgression`), distinct from scalar `Sampler` outputs |
+| **ChordProgression** | Timed sequence of chords on a beat grid; a **data signal** sampled per frame via `ChordSignal` (with wired tempo) |
+| **Tempo** | Beats per minute; a **data signal** (`tempo` port type) composed at translate time |
+| **TimeSignature** | Beats per bar and beat unit; a **data signal** (`time_signature` port type) composed at translate time |
+| **Data signal** | Structured translate-time or sample-time value (e.g. `Score`, `ChordProgression`, `Tempo`, `TimeSignature`), distinct from scalar `Sampler` outputs |
 | **Composition** | Procedural generators that produce notation |
 | **Scheduling** | Converting musical time to sample-frame timelines |
 | **Instrumentation** | Per-note instrument instances, envelopes, and mix-down |
@@ -37,7 +39,7 @@ flowchart LR
 1. **Imp graph** — denotes `Time → Sample`; music nodes delegate to composition crates at translate time.
 2. **Translation** — `translate_graph` composes pure `Sampler` closures.
 3. **Sampling** — `sample_graph` applies `f(t)` per frame over the render duration.
-4. **Notation path** — `arpeggio`, `epic_minor_progression`, and related nodes build scores and progressions; schedule tables drive note gates at sample time.
+4. **Notation path** — `arpeggio`, `epic_minor_progression`, `constant_tempo`, `constant_time_signature`, and related nodes build scores, progressions, tempo, and meter; schedule tables drive note gates at sample time.
 5. **Output** — CLI or demo scripts write WAV files.
 
 ## Integration rules

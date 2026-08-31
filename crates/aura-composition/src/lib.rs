@@ -129,11 +129,9 @@ pub struct ChordRegion {
     pub chord: Chord,
 }
 
-/// Timed sequence of chords with tempo and meter.
+/// Timed sequence of chords on a beat grid.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChordProgression {
-    pub tempo: Tempo,
-    pub time_signature: TimeSignature,
     pub regions: Vec<ChordRegion>,
 }
 
@@ -155,21 +153,43 @@ impl ChordProgression {
             })
     }
 
-    /// Active chord at the given time in seconds.
-    pub fn chord_at_secs(&self, time_secs: f64) -> &Chord {
-        let beat = time_secs / self.tempo.seconds_per_beat();
+    /// Active chord at the given time in seconds at the given tempo.
+    pub fn chord_at_secs(&self, time_secs: f64, tempo: Tempo) -> &Chord {
+        let beat = time_secs / tempo.seconds_per_beat();
         self.chord_at_beats(beat)
     }
 }
 
-/// Per-frame chord lookup for data signals.
+/// Per-frame tempo lookup for data signals.
+pub trait TempoSignal: Send + Sync {
+    fn tempo_at(&self, time_secs: f64) -> Tempo;
+}
+
+impl TempoSignal for Tempo {
+    fn tempo_at(&self, _time_secs: f64) -> Tempo {
+        *self
+    }
+}
+
+/// Per-frame time signature lookup for data signals.
+pub trait TimeSignatureSignal: Send + Sync {
+    fn time_signature_at(&self, time_secs: f64) -> TimeSignature;
+}
+
+impl TimeSignatureSignal for TimeSignature {
+    fn time_signature_at(&self, _time_secs: f64) -> TimeSignature {
+        *self
+    }
+}
+
+/// Per-frame chord lookup for data signals (requires tempo for sec→beat conversion).
 pub trait ChordSignal: Send + Sync {
-    fn chord_at(&self, time_secs: f64) -> Chord;
+    fn chord_at(&self, time_secs: f64, tempo: Tempo) -> Chord;
 }
 
 impl ChordSignal for ChordProgression {
-    fn chord_at(&self, time_secs: f64) -> Chord {
-        self.chord_at_secs(time_secs).clone()
+    fn chord_at(&self, time_secs: f64, tempo: Tempo) -> Chord {
+        self.chord_at_secs(time_secs, tempo).clone()
     }
 }
 
@@ -313,8 +333,6 @@ mod tests {
     #[test]
     fn progression_chord_at_beats() {
         let progression = ChordProgression {
-            tempo: Tempo::default(),
-            time_signature: TimeSignature::FOUR_FOUR,
             regions: vec![
                 ChordRegion {
                     start_beats: 0.0,

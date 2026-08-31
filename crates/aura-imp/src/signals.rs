@@ -17,6 +17,12 @@ pub const SCORE: &str = "score";
 /// Chord progression (translate-time data signal).
 pub const CHORD_PROGRESSION: &str = "chord_progression";
 
+/// Tempo (translate-time data signal).
+pub const TEMPO: &str = "tempo";
+
+/// Time signature (translate-time data signal).
+pub const TIME_SIGNATURE: &str = "time_signature";
+
 pub fn signal(id: &str) -> SignalType {
     SignalType { id: id.into() }
 }

@@ -8,6 +8,8 @@ use aura_composition::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArpeggioConfig {
     pub progression: ChordProgression,
+    pub tempo: Tempo,
+    pub time_signature: TimeSignature,
     pub bars: u32,
     /// Subdivision of a whole note (8 = eighth notes).
     pub subdivision: u8,
@@ -16,17 +18,22 @@ pub struct ArpeggioConfig {
 impl Default for ArpeggioConfig {
     fn default() -> Self {
         Self {
-            progression: epic_minor_progression(Semitone::A3, 1),
+            progression: epic_minor_progression(Semitone::A3, 1, TimeSignature::FOUR_FOUR),
+            tempo: Tempo::default(),
+            time_signature: TimeSignature::FOUR_FOUR,
             bars: 4,
             subdivision: 4,
         }
     }
 }
 
-/// Epic i → VI → III → VII minor-key progression, one chord per bar in 4/4.
-pub fn epic_minor_progression(key_root: Semitone, bars_per_chord: u32) -> ChordProgression {
-    let beats_per_chord =
-        bars_per_chord as f64 * TimeSignature::FOUR_FOUR.quarter_beats_per_bar();
+/// Epic i → VI → III → VII minor-key progression, one chord per bar.
+pub fn epic_minor_progression(
+    key_root: Semitone,
+    bars_per_chord: u32,
+    time_signature: TimeSignature,
+) -> ChordProgression {
+    let beats_per_chord = bars_per_chord as f64 * time_signature.quarter_beats_per_bar();
     let chords = [
         NaturalMinor::triad_i(key_root),
         NaturalMinor::triad_vi(key_root),
@@ -44,11 +51,7 @@ pub fn epic_minor_progression(key_root: Semitone, bars_per_chord: u32) -> ChordP
         })
         .collect();
 
-    ChordProgression {
-        tempo: Tempo::default(),
-        time_signature: TimeSignature::FOUR_FOUR,
-        regions,
-    }
+    ChordProgression { regions }
 }
 
 /// Generates an arpeggio driven by a chord progression (chord at each note start).
@@ -57,7 +60,7 @@ pub fn epic_minor_progression(key_root: Semitone, bars_per_chord: u32) -> ChordP
 /// progression meter (e.g. four quarter-note picks per bar in 4/4: root–third–fifth–root).
 pub fn arpeggio(config: ArpeggioConfig) -> Score {
     let note_duration_beats = 4.0 / f64::from(config.subdivision);
-    let beats_per_bar = config.progression.time_signature.quarter_beats_per_bar();
+    let beats_per_bar = config.time_signature.quarter_beats_per_bar();
     let total_beats = beats_per_bar * f64::from(config.bars);
 
     let mut events = Vec::new();
@@ -74,11 +77,7 @@ pub fn arpeggio(config: ArpeggioConfig) -> Score {
         beat += note_duration_beats;
     }
 
-    Score::new(
-        config.progression.time_signature,
-        config.progression.tempo,
-        events,
-    )
+    Score::new(config.time_signature, config.tempo, events)
 }
 
 #[cfg(test)]
@@ -126,7 +125,7 @@ mod tests {
     #[test]
     fn arpeggio_starts_each_bar_on_chord_root() {
         let score = arpeggio(ArpeggioConfig::default());
-        let progression = epic_minor_progression(Semitone::A3, 1);
+        let progression = epic_minor_progression(Semitone::A3, 1, TimeSignature::FOUR_FOUR);
         let beats_per_bar = 4.0;
         for bar in 0..4 {
             let bar_start = bar as f64 * beats_per_bar;
@@ -148,7 +147,7 @@ mod tests {
 
     #[test]
     fn epic_progression_has_four_regions() {
-        let progression = epic_minor_progression(Semitone::A3, 1);
+        let progression = epic_minor_progression(Semitone::A3, 1, TimeSignature::FOUR_FOUR);
         assert_eq!(progression.regions.len(), 4);
         assert!((progression.regions[0].duration_beats - 4.0).abs() < 1e-9);
     }

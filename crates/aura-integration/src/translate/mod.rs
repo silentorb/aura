@@ -4,7 +4,7 @@ mod note_schedule;
 
 use note_schedule::NoteSchedule;
 use aura_composer::{arpeggio, epic_minor_progression, ArpeggioConfig};
-use aura_composition::{ChordProgression, ChordSignal, Score, Semitone, Tempo};
+use aura_composition::{ChordProgression, ChordSignal, Score, Semitone, Tempo, TimeSignature};
 use aura_dsp::{multiply, sine};
 use aura_imp::{Graph, Node, NodeId, PortReference, PrimitiveValue, Registry};
 use aura_instrumentation::LinearAdsr;
@@ -35,12 +35,18 @@ pub enum TranslateError {
     InvalidScoreSource { node: NodeId },
     #[error("progression input on node `{node}` must connect to a chord progression node")]
     InvalidProgressionSource { node: NodeId },
+    #[error("tempo input on node `{node}` must connect to a tempo-producing node")]
+    InvalidTempoSource { node: NodeId },
+    #[error("time signature input on node `{node}` must connect to a time signature node")]
+    InvalidTimeSignatureSource { node: NodeId },
 }
 
 enum NodeValue {
     Signal(Box<dyn Sampler>),
     Score(Score),
     ChordProgression(ChordProgression),
+    Tempo(Tempo),
+    TimeSignature(TimeSignature),
 }
 
 /// Translates an Imp graph into a pure Time → Sample function.
@@ -63,7 +69,10 @@ pub fn translate_graph(
         "value",
     )? {
         NodeValue::Signal(sampler) => Ok(sampler),
-        NodeValue::Score(_) | NodeValue::ChordProgression(_) => {
+        NodeValue::Score(_)
+        | NodeValue::ChordProgression(_)
+        | NodeValue::Tempo(_)
+        | NodeValue::TimeSignature(_) => {
             Err(TranslateError::MissingOutputPort {
                 node: output_node,
                 port: "value".into(),
@@ -217,8 +226,37 @@ fn translate_node(
             Ok(NodeValue::Signal(Box::new(SemitoneToHzSampler { semitone })))
         }
         "epic_minor_progression" => Ok(NodeValue::ChordProgression(
-            build_epic_minor_progression(node)?,
+            build_epic_minor_progression(
+                graph,
+                registry,
+                sample_rate,
+                edges_by_target,
+                visiting,
+                node,
+            )?,
         )),
+        "constant_tempo" => Ok(NodeValue::Tempo(build_constant_tempo(node)?)),
+        "constant_time_signature" => Ok(NodeValue::TimeSignature(
+            build_constant_time_signature(node)?,
+        )),
+        "tempo_at_time" => translate_tempo_at_time_port(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node_id,
+            output_port,
+        ),
+        "time_signature_at_time" => translate_time_signature_at_time_port(
+            graph,
+            registry,
+            sample_rate,
+            edges_by_target,
+            visiting,
+            node_id,
+            output_port,
+        ),
         "arpeggio" => Ok(NodeValue::Score(build_arpeggio_score(
             graph,
             registry,
@@ -328,6 +366,15 @@ fn translate_chord_at_time_port(
         node_id,
         "progression",
     )?;
+    let tempo = resolve_tempo_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "tempo",
+    )?;
     let _time = signal_input(
         graph,
         registry,
@@ -339,8 +386,91 @@ fn translate_chord_at_time_port(
     )?;
 
     let sampler: Box<dyn Sampler> = match output_port {
-        "root" => Box::new(ChordRootSampler { progression }),
-        "active" => Box::new(ChordActiveSampler { progression }),
+        "root" => Box::new(ChordRootSampler { progression, tempo }),
+        "active" => Box::new(ChordActiveSampler { progression, tempo }),
+        _ => {
+            return Err(TranslateError::MissingOutputPort {
+                node: node_id.into(),
+                port: output_port.into(),
+            })
+        }
+    };
+
+    Ok(NodeValue::Signal(sampler))
+}
+
+fn translate_tempo_at_time_port(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    output_port: &str,
+) -> Result<NodeValue, TranslateError> {
+    let tempo = resolve_tempo_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "tempo",
+    )?;
+    let _time = signal_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "time",
+    )?;
+
+    let sampler: Box<dyn Sampler> = match output_port {
+        "bpm" => Box::new(TempoBpmSampler { tempo }),
+        _ => {
+            return Err(TranslateError::MissingOutputPort {
+                node: node_id.into(),
+                port: output_port.into(),
+            })
+        }
+    };
+
+    Ok(NodeValue::Signal(sampler))
+}
+
+fn translate_time_signature_at_time_port(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    output_port: &str,
+) -> Result<NodeValue, TranslateError> {
+    let time_signature = resolve_time_signature_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "time_signature",
+    )?;
+    let _time = signal_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        node_id,
+        "time",
+    )?;
+
+    let sampler: Box<dyn Sampler> = match output_port {
+        "beats_per_bar" => Box::new(BeatsPerBarSampler { time_signature }),
+        "beat_unit" => Box::new(BeatUnitSampler { time_signature }),
         _ => {
             return Err(TranslateError::MissingOutputPort {
                 node: node_id.into(),
@@ -404,6 +534,62 @@ fn resolve_progression_input(
     }
 }
 
+fn resolve_tempo_input(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    port: &str,
+) -> Result<Tempo, TranslateError> {
+    let Some(source) = edges_by_target.get(&(node_id.into(), port.into())) else {
+        return Ok(Tempo::default());
+    };
+    match translate_node(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &source.node,
+        &source.port,
+    )? {
+        NodeValue::Tempo(tempo) => Ok(tempo),
+        _ => Err(TranslateError::InvalidTempoSource {
+            node: source.node.clone(),
+        }),
+    }
+}
+
+fn resolve_time_signature_input(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node_id: &str,
+    port: &str,
+) -> Result<TimeSignature, TranslateError> {
+    let Some(source) = edges_by_target.get(&(node_id.into(), port.into())) else {
+        return Ok(TimeSignature::default());
+    };
+    match translate_node(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &source.node,
+        &source.port,
+    )? {
+        NodeValue::TimeSignature(time_signature) => Ok(time_signature),
+        _ => Err(TranslateError::InvalidTimeSignatureSource {
+            node: source.node.clone(),
+        }),
+    }
+}
+
 fn signal_input(
     graph: &Graph,
     registry: &Registry,
@@ -435,22 +621,56 @@ fn signal_input(
         NodeValue::ChordProgression(_) => Err(TranslateError::InvalidProgressionSource {
             node: source.node,
         }),
+        NodeValue::Tempo(_) => Err(TranslateError::InvalidTempoSource {
+            node: source.node,
+        }),
+        NodeValue::TimeSignature(_) => Err(TranslateError::InvalidTimeSignatureSource {
+            node: source.node,
+        }),
     }
 }
 
-fn build_epic_minor_progression(node: &Node) -> Result<ChordProgression, TranslateError> {
+fn build_constant_tempo(node: &Node) -> Result<Tempo, TranslateError> {
+    Tempo::new(read_number_input(node, "bpm", 120.0)?).map_err(|_| TranslateError::ExpectedNumber {
+        node: node.id.clone(),
+        port: "bpm".into(),
+    })
+}
+
+fn build_constant_time_signature(node: &Node) -> Result<TimeSignature, TranslateError> {
+    let beats_per_bar = read_number_input(node, "beats_per_bar", 4.0)? as u8;
+    let beat_unit = read_number_input(node, "beat_unit", 4.0)? as u8;
+    Ok(TimeSignature {
+        beats_per_bar,
+        beat_unit,
+    })
+}
+
+fn build_epic_minor_progression(
+    graph: &Graph,
+    registry: &Registry,
+    sample_rate: SampleRate,
+    edges_by_target: &BTreeMap<TargetKey, PortReference>,
+    visiting: &mut BTreeSet<NodeId>,
+    node: &Node,
+) -> Result<ChordProgression, TranslateError> {
     let root = read_number_input(node, "root", Semitone::A3.0 as f64)? as i16;
     let bars_per_chord = read_number_input(node, "bars_per_chord", 1.0)? as u32;
-    let tempo = Tempo::new(read_number_input(node, "tempo", 120.0)?).map_err(|_| {
-        TranslateError::ExpectedNumber {
-            node: node.id.clone(),
-            port: "tempo".into(),
-        }
-    })?;
+    let time_signature = resolve_time_signature_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "time_signature",
+    )?;
 
-    let mut progression = epic_minor_progression(Semitone(root), bars_per_chord);
-    progression.tempo = tempo;
-    Ok(progression)
+    Ok(epic_minor_progression(
+        Semitone(root),
+        bars_per_chord,
+        time_signature,
+    ))
 }
 
 fn build_arpeggio_score(
@@ -470,11 +690,31 @@ fn build_arpeggio_score(
         &node.id,
         "progression",
     )?;
+    let tempo = resolve_tempo_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "tempo",
+    )?;
+    let time_signature = resolve_time_signature_input(
+        graph,
+        registry,
+        sample_rate,
+        edges_by_target,
+        visiting,
+        &node.id,
+        "time_signature",
+    )?;
     let bars = read_number_input(node, "bars", 4.0)? as u32;
     let subdivision = read_number_input(node, "subdivision", 4.0)? as u8;
 
     Ok(arpeggio(ArpeggioConfig {
         progression,
+        tempo,
+        time_signature,
         bars,
         subdivision,
     }))
@@ -649,21 +889,23 @@ impl Sampler for NoteEnvelopeSampler {
 
 struct ChordRootSampler {
     progression: ChordProgression,
+    tempo: Tempo,
 }
 
 impl Sampler for ChordRootSampler {
     fn at(&self, t: f64) -> f32 {
-        self.progression.chord_at(t).root.0 as f32
+        self.progression.chord_at(t, self.tempo).root.0 as f32
     }
 }
 
 struct ChordActiveSampler {
     progression: ChordProgression,
+    tempo: Tempo,
 }
 
 impl Sampler for ChordActiveSampler {
     fn at(&self, t: f64) -> f32 {
-        let beat = t / self.progression.tempo.seconds_per_beat();
+        let beat = t / self.tempo.seconds_per_beat();
         if self
             .progression
             .regions
@@ -677,6 +919,36 @@ impl Sampler for ChordActiveSampler {
         } else {
             0.0
         }
+    }
+}
+
+struct TempoBpmSampler {
+    tempo: Tempo,
+}
+
+impl Sampler for TempoBpmSampler {
+    fn at(&self, _t: f64) -> f32 {
+        self.tempo.bpm as f32
+    }
+}
+
+struct BeatsPerBarSampler {
+    time_signature: TimeSignature,
+}
+
+impl Sampler for BeatsPerBarSampler {
+    fn at(&self, _t: f64) -> f32 {
+        f32::from(self.time_signature.beats_per_bar)
+    }
+}
+
+struct BeatUnitSampler {
+    time_signature: TimeSignature,
+}
+
+impl Sampler for BeatUnitSampler {
+    fn at(&self, _t: f64) -> f32 {
+        f32::from(self.time_signature.beat_unit)
     }
 }
 

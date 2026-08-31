@@ -1,6 +1,8 @@
 //! Musical composition node library.
 
-use crate::signals::{signal, CHORD_PROGRESSION, CONTROL, SCORE, TIME};
+use crate::signals::{
+    signal, CHORD_PROGRESSION, CONTROL, SCORE, TEMPO, TIME, TIME_SIGNATURE,
+};
 use imp_core_types::{NodeLibrary, NodeType, Port, PrimitiveValue};
 use std::collections::BTreeMap;
 
@@ -18,8 +20,52 @@ pub fn music_node_library() -> NodeLibrary {
     let score = signal(SCORE);
     let time = signal(TIME);
     let progression = signal(CHORD_PROGRESSION);
+    let tempo = signal(TEMPO);
+    let time_signature = signal(TIME_SIGNATURE);
 
     let mut types = BTreeMap::new();
+    types.insert(
+        "constant_tempo".into(),
+        NodeType {
+            id: "constant_tempo".into(),
+            inputs: BTreeMap::from([(
+                "bpm".into(),
+                port("bpm", control.clone(), Some(PrimitiveValue::Number(120.0))),
+            )]),
+            outputs: BTreeMap::from([(
+                "tempo".into(),
+                port("tempo", tempo.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "constant_time_signature".into(),
+        NodeType {
+            id: "constant_time_signature".into(),
+            inputs: BTreeMap::from([
+                (
+                    "beats_per_bar".into(),
+                    port(
+                        "beats_per_bar",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(4.0)),
+                    ),
+                ),
+                (
+                    "beat_unit".into(),
+                    port(
+                        "beat_unit",
+                        control.clone(),
+                        Some(PrimitiveValue::Number(4.0)),
+                    ),
+                ),
+            ]),
+            outputs: BTreeMap::from([(
+                "time_signature".into(),
+                port("time_signature", time_signature.clone(), None),
+            )]),
+        },
+    );
     types.insert(
         "epic_minor_progression".into(),
         NodeType {
@@ -38,8 +84,8 @@ pub fn music_node_library() -> NodeLibrary {
                     ),
                 ),
                 (
-                    "tempo".into(),
-                    port("tempo", control.clone(), Some(PrimitiveValue::Number(120.0))),
+                    "time_signature".into(),
+                    port("time_signature", time_signature.clone(), None),
                 ),
             ]),
             outputs: BTreeMap::from([(
@@ -56,6 +102,14 @@ pub fn music_node_library() -> NodeLibrary {
                 (
                     "progression".into(),
                     port("progression", progression.clone(), None),
+                ),
+                (
+                    "tempo".into(),
+                    port("tempo", tempo.clone(), None),
+                ),
+                (
+                    "time_signature".into(),
+                    port("time_signature", time_signature.clone(), None),
                 ),
                 (
                     "bars".into(),
@@ -113,6 +167,10 @@ pub fn music_node_library() -> NodeLibrary {
                     "progression".into(),
                     port("progression", progression.clone(), None),
                 ),
+                (
+                    "tempo".into(),
+                    port("tempo", tempo.clone(), None),
+                ),
                 ("time".into(), port("time", time.clone(), None)),
             ]),
             outputs: BTreeMap::from([
@@ -123,6 +181,43 @@ pub fn music_node_library() -> NodeLibrary {
                 (
                     "active".into(),
                     port("active", control.clone(), None),
+                ),
+            ]),
+        },
+    );
+    types.insert(
+        "tempo_at_time".into(),
+        NodeType {
+            id: "tempo_at_time".into(),
+            inputs: BTreeMap::from([
+                ("tempo".into(), port("tempo", tempo.clone(), None)),
+                ("time".into(), port("time", time.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([(
+                "bpm".into(),
+                port("bpm", control.clone(), None),
+            )]),
+        },
+    );
+    types.insert(
+        "time_signature_at_time".into(),
+        NodeType {
+            id: "time_signature_at_time".into(),
+            inputs: BTreeMap::from([
+                (
+                    "time_signature".into(),
+                    port("time_signature", time_signature.clone(), None),
+                ),
+                ("time".into(), port("time", time.clone(), None)),
+            ]),
+            outputs: BTreeMap::from([
+                (
+                    "beats_per_bar".into(),
+                    port("beats_per_bar", control.clone(), None),
+                ),
+                (
+                    "beat_unit".into(),
+                    port("beat_unit", control.clone(), None),
                 ),
             ]),
         },
