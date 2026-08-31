@@ -6,6 +6,7 @@
   },
   "remoteUser": "vscode",
   "mounts": [
+    "source=${localEnv:HOME}/dev/imp-rust,target=${containerWorkspaceFolder}/.mnt/imp-rust,type=bind,consistency=cached",
     "source=${localEnv:HOME}/dev/imp-ts,target=${containerWorkspaceFolder}/.mnt/imp-ts,type=bind,consistency=cached,readonly",
     "source=${localEnv:HOME}/dev/imp-spec,target=${containerWorkspaceFolder}/.mnt/imp-spec,type=bind,consistency=cached"
   ],

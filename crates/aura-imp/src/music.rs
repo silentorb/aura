@@ -28,6 +28,8 @@ pub fn music_node_library() -> NodeLibrary {
         "constant_tempo".into(),
         NodeType {
             id: "constant_tempo".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([(
                 "bpm".into(),
                 port("bpm", control.clone(), Some(PrimitiveValue::Number(120.0))),
@@ -42,6 +44,8 @@ pub fn music_node_library() -> NodeLibrary {
         "constant_time_signature".into(),
         NodeType {
             id: "constant_time_signature".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "beats_per_bar".into(),
@@ -70,6 +74,8 @@ pub fn music_node_library() -> NodeLibrary {
         "epic_minor_progression".into(),
         NodeType {
             id: "epic_minor_progression".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "root".into(),
@@ -98,6 +104,8 @@ pub fn music_node_library() -> NodeLibrary {
         "drum_grid".into(),
         NodeType {
             id: "drum_grid".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "tempo".into(),
@@ -126,6 +134,8 @@ pub fn music_node_library() -> NodeLibrary {
         "arpeggio".into(),
         NodeType {
             id: "arpeggio".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "progression".into(),
@@ -162,6 +172,8 @@ pub fn music_node_library() -> NodeLibrary {
         "note_at_time".into(),
         NodeType {
             id: "note_at_time".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("score".into(), port("score", score.clone(), None)),
                 ("time".into(), port("time", time.clone(), None)),
@@ -190,6 +202,8 @@ pub fn music_node_library() -> NodeLibrary {
         "chord_at_time".into(),
         NodeType {
             id: "chord_at_time".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "progression".into(),
@@ -217,6 +231,8 @@ pub fn music_node_library() -> NodeLibrary {
         "tempo_at_time".into(),
         NodeType {
             id: "tempo_at_time".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("tempo".into(), port("tempo", tempo.clone(), None)),
                 ("time".into(), port("time", time.clone(), None)),
@@ -231,6 +247,8 @@ pub fn music_node_library() -> NodeLibrary {
         "time_signature_at_time".into(),
         NodeType {
             id: "time_signature_at_time".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "time_signature".into(),
@@ -254,6 +272,8 @@ pub fn music_node_library() -> NodeLibrary {
         "semitone_to_hz".into(),
         NodeType {
             id: "semitone_to_hz".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([(
                 "semitone".into(),
                 port("semitone", control, None),

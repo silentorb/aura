@@ -22,6 +22,8 @@ pub fn time_node_library() -> NodeLibrary {
         "time".into(),
         NodeType {
             id: "time".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::new(),
             outputs: BTreeMap::from([(
                 "time".into(),
@@ -33,6 +35,8 @@ pub fn time_node_library() -> NodeLibrary {
         "time_elapsed".into(),
         NodeType {
             id: "time_elapsed".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("time".into(), port("time", time.clone(), None)),
                 ("start".into(), port("start", control, None)),

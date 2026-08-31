@@ -1,6 +1,6 @@
 //! Shared signal type identifiers for Aura Imp libraries.
 
-use imp_core_types::SignalType;
+use imp_core_types::{concrete_type, SignalType};
 
 /// Seconds from render start.
 pub const TIME: &str = "time";
@@ -24,5 +24,5 @@ pub const TEMPO: &str = "tempo";
 pub const TIME_SIGNATURE: &str = "time_signature";
 
 pub fn signal(id: &str) -> SignalType {
-    SignalType { id: id.into() }
+    concrete_type(id, vec![])
 }

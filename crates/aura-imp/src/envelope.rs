@@ -22,6 +22,8 @@ pub fn envelope_node_library() -> NodeLibrary {
         "linear_adsr".into(),
         NodeType {
             id: "linear_adsr".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "attack".into(),
@@ -55,6 +57,8 @@ pub fn envelope_node_library() -> NodeLibrary {
         "note_envelope".into(),
         NodeType {
             id: "note_envelope".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("score".into(), port("score", signal(crate::signals::SCORE), None)),
                 ("time".into(), port("time", time, None)),

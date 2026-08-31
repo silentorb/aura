@@ -12,7 +12,7 @@ Rust (primary).
 
 ## Development environment
 
-This project uses a [Dev Container](.devcontainer/devcontainer.json) built from a custom Dockerfile. The image bakes in sibling `imp-rust` at `/opt/imp-rust` (build context is the parent of `aura/`; expected layout: `~/dev/aura` + `~/dev/imp-rust`). Rebuild the container after imp-rust changes.
+This project uses a [Dev Container](.devcontainer/devcontainer.json) built from a custom Dockerfile. Sibling imp repos are bind-mounted under `.mnt/` at container start (expected host layout: `~/dev/aura`, `~/dev/imp-rust`, `~/dev/imp-spec`, `~/dev/imp-ts`). Cargo path deps resolve `imp-rust` from `.mnt/imp-rust`.
 
 Open the repository in a Dev Container to get rust-analyzer, Clippy, and LLDB preconfigured.
 

@@ -23,6 +23,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "sine".into(),
         NodeType {
             id: "sine".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "frequency".into(),
@@ -44,6 +46,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "exponential_sweep_sine".into(),
         NodeType {
             id: "exponential_sweep_sine".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "start_hz".into(),
@@ -73,6 +77,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "deterministic_noise".into(),
         NodeType {
             id: "deterministic_noise".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "seed".into(),
@@ -90,6 +96,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "highpass_noise".into(),
         NodeType {
             id: "highpass_noise".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 (
                     "seed".into(),
@@ -111,6 +119,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "multiply".into(),
         NodeType {
             id: "multiply".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("a".into(), port("a", audio_mono.clone(), None)),
                 ("b".into(), port("b", audio_mono.clone(), None)),
@@ -125,6 +135,8 @@ pub fn dsp_node_library() -> NodeLibrary {
         "add".into(),
         NodeType {
             id: "add".into(),
+            type_params: Vec::new(),
+            implementation: None,
             inputs: BTreeMap::from([
                 ("a".into(), port("a", audio_mono.clone(), None)),
                 ("b".into(), port("b", audio_mono, None)),
